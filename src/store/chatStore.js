@@ -1,13 +1,75 @@
 import { create } from 'zustand'
 
+/**
+ * Chat Store - Manages chat state including conversations and messages
+ * 
+ * State:
+ * - conversations: Array of conversation objects
+ * - activeConversation: Currently selected conversation or null
+ * - messages: Array of messages in active conversation
+ * - isLoading: Loading state for chat operations
+ * - error: Error message from chat operations
+ * 
+ * Persistence:
+ * - Not persisted to localStorage
+ * - Fetched from backend API on each session
+ * - Updated in real-time via WebSocket events
+ */
 const useChatStore = create((set) => ({
+  // State
   conversations: [],
   activeConversation: null,
   messages: [],
-  setConversations: (conversations) => set({ conversations }),
+  isLoading: false,
+  error: null,
+
+  // Actions
+  /**
+   * Set list of conversations
+   */
+  setConversations: (conversations) => set({ conversations, error: null }),
+
+  /**
+   * Set active conversation and clear messages
+   * Messages will be fetched separately
+   */
   setActiveConversation: (conversation) => set({ activeConversation: conversation, messages: [] }),
+
+  /**
+   * Add a new message to the messages array
+   * Used for real-time message reception via WebSocket
+   */
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
-  setMessages: (messages) => set({ messages }),
+
+  /**
+   * Set complete messages array for active conversation
+   * Used when fetching message history
+   */
+  setMessages: (messages) => set({ messages, error: null }),
+
+  /**
+   * Update an existing message (e.g., status change, edit)
+   */
+  updateMessage: (messageId, updates) =>
+    set((state) => ({
+      messages: state.messages.map((msg) =>
+        msg.id === messageId ? { ...msg, ...updates } : msg
+      ),
+    })),
+
+  /**
+   * Set loading state for chat operations
+   */
+  setLoading: (isLoading) => {
+    set({ isLoading })
+  },
+
+  /**
+   * Set error message from chat operation
+   */
+  setError: (error) => {
+    set({ error })
+  },
 }))
 
 export default useChatStore

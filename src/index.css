@@ -1,3 +1,27 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer utilities {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  .glass-card-solid {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+  }
+  .primary-gradient {
+    background: linear-gradient(135deg, #7C3AED 0%, #A855F7 100%);
+  }
+  .soft-glow {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .bg-custom-gradient {
+    background: linear-gradient(135deg, #F3E8FF 0%, #FAF5FF 100%);
+  }
+  .btn-primary-gradient {
+    background: linear-gradient(90deg, #7C3AED 0%, #A855F7 100%);
+  }
+}
