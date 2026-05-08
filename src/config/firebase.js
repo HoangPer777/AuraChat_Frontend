@@ -19,6 +19,9 @@ const auth = getAuth(app);
 
 // Initialize Providers
 const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 const facebookProvider = new FacebookAuthProvider();
 
 export { app, analytics, auth, googleProvider, facebookProvider };

@@ -37,14 +37,12 @@ export default function LoginPage() {
           setApiError(response.data.message || 'Đăng nhập bằng chuyển hướng thất bại.');
         }
       } catch (err) {
-        console.error('Firebase Redirect Login Error:', {
-          code: err?.code,
-          message: err?.message,
-          response: err?.response?.data,
-          status: err?.response?.status
-        });
+        console.error('Firebase Redirect Login Error:', err);
         if (!isMounted) return;
-        setApiError(err.response?.data?.message || err.message || 'Đã có lỗi xảy ra khi xử lý đăng nhập chuyển hướng.');
+        // Ignore popup closed or cancelled requests during redirect check
+        if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+          setApiError(err.response?.data?.message || err.message || 'Đã có lỗi xảy ra khi xử lý đăng nhập chuyển hướng.');
+        }
       } finally {
         if (isMounted) {
           setIsLoading(false);
