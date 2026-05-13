@@ -80,21 +80,7 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: |
-            docker-compose.yml
-            Dockerfile
-            nginx.conf
-            package.json
-            package-lock.json
-            postcss.config.js
-            tailwind.config.js
-            vite.config.js
-            vitest.config.js
-            src
-            public
-            index.html
-            login.html
-            forgot.html
+          source: "./*"  # Lấy tất cả các file có trong thư mục hiện tại của Runner
           target: /home/${{ secrets.USERNAME }}/project-fe
 
       - name: Deploy with docker compose
