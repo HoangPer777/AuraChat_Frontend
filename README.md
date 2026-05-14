@@ -58,15 +58,6 @@ Sao chép file mẫu rồi điền thông tin:
 cp .env.example .env
 ```
 
-Nội dung `.env`:
-
-```dotenv
-# URL của Backend API
-# - Khi chạy Docker: giữ nguyên http://localhost:8080
-# - Khi deploy production: thay bằng domain thực của backend
-VITE_API_BASE_URL=http://localhost:8080
-```
-
 > **Lưu ý:** Tất cả biến môi trường Vite phải có tiền tố `VITE_` mới được nhúng vào bundle.
 
 ---

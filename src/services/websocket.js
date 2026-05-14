@@ -42,7 +42,9 @@ export async function connect(onConnected, onDisconnected, onError) {
     stompClient = new Client({
       brokerURL: undefined, // Use webSocketFactory instead
       webSocketFactory: () => {
-        const wsUrl = `${import.meta.env.VITE_WS_URL || 'ws://localhost:8080'}/ws`
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        const host = window.location.host
+        const wsUrl = `${protocol}//${host}/ws`
         return new SockJS(wsUrl)
       },
       connectHeaders: {
