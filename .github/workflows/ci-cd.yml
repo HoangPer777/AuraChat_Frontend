@@ -95,4 +95,4 @@ jobs:
             cat > .env <<'EOF'
             ${{ secrets.ENV_FILE_CONTENT }}
             EOF
-            docker compose up -d --build
+            docker compose up -d --build || docker-compose up -d --build
