@@ -26,7 +26,6 @@ deploy:
             set -e
             cd /home/${{ secrets.USERNAME }}/project-fe
             
-            # Khởi tạo file .env
             cat > .env <<'EOF'
             ${{ secrets.ENV_FILE_CONTENT }}
             EOF
