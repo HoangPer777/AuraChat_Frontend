@@ -1,4 +1,73 @@
-deploy:
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        # Sửa lỗi --runInBand của Vitest bằng cách dùng --no-threads
+        run: npm test -- --run --no-threads
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          tags: project-fe:ci
+
+  docker-compose:
+    runs-on: ubuntu-latest
+    needs: docker-build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and run docker compose
+        run: |
+          docker compose up -d --build
+
+      - name: Show containers
+        run: docker compose ps
+
+      - name: Tear down
+        if: always()
+        run: docker compose down --volumes
+
+  deploy:
     runs-on: ubuntu-latest
     needs: docker-build
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
@@ -12,9 +81,10 @@ deploy:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "./*"
+          # Dùng "." để lấy toàn bộ thư mục gốc mà không bị lỗi tar
+          source: "."
           target: /home/${{ secrets.USERNAME }}/project-fe
-          rm: true # Xóa code cũ để tránh xung đột file
+          rm: true
 
       - name: Deploy with docker compose
         uses: appleboy/ssh-action@v1.0.3
@@ -26,19 +96,23 @@ deploy:
             set -e
             cd /home/${{ secrets.USERNAME }}/project-fe
             
+            # Ghi file môi trường
             cat > .env <<'EOF'
             ${{ secrets.ENV_FILE_CONTENT }}
             EOF
 
-            # Cách 2: Tắt Buildkit để tránh lỗi Buildx version quá cũ
-            # Chúng ta sẽ thử docker-compose trước vì nó thường ổn định hơn trên server cũ
+            # TẮT BUILDKIT: Ép Docker dùng bộ build truyền thống không cần Buildx 0.17
             export DOCKER_BUILDKIT=0
             export COMPOSE_DOCKER_CLI_BUILD=0
 
+            # Kiểm tra xem server dùng lệnh docker-compose (V1) hay docker compose (V2)
             if command -v docker-compose >/dev/null 2>&1; then
-              echo "Using docker-compose..."
+              echo "Using docker-compose (V1)..."
               docker-compose up -d --build
             else
-              echo "Using docker compose..."
+              echo "Using docker compose (V2)..."
               docker compose up -d --build
             fi
+
+            # Dọn dẹp các ảnh thừa sau khi build để tránh đầy ổ cứng server
+            docker image prune -f
