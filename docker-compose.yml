@@ -12,4 +12,4 @@ services:
       - VITE_WS_URL=${VITE_WS_URL:-ws://aura-chat.io.vn:8080}
       # Dev local: backend chạy trên máy host
       # Deploy production: đổi thành http://<server-ip>:8080 hoặc https://api.yourdomain.com
-      - BACKEND_URL=${BACKEND_URL:-http://host.docker.internal:8080}
+      - BACKEND_URL=${BACKEND_URL:-http://172.17.0.1:8080}
