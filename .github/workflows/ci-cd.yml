@@ -28,8 +28,8 @@ jobs:
         run: npm ci
 
       - name: Run unit tests
-        # Vitest already runs with --run via package.json; add only the no-threads flag.
-        run: npm test -- --no-threads
+        # Keep the default Vitest CLI args from package.json.
+        run: npm test
 
   docker-build:
     runs-on: ubuntu-latest
