@@ -7,6 +7,7 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
 import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import OAuth2CallbackPage from './pages/auth/OAuth2CallbackPage'
 import ChatPage from './pages/chat/ChatPage'
+import FindUsersPage from './pages/FindUsersPage'
 import HomePage from './pages/chat/HomePage'
 import ChatWindowPage from './pages/chat/ChatWindowPage'
 import FriendsPage from './pages/chat/FriendsPage'
@@ -47,6 +48,7 @@ function App() {
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/users" element={<FindUsersPage />} />
           <Route path="/media" element={<MediaLibraryPage />} />
           <Route
             path="/profile"

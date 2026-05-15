@@ -21,10 +21,12 @@ function ProfilePage() {
       try {
         setIsLoading(true)
         const response = await api.get('/auth/me')
-        setUser(response.data)
+        // API trả về { success, data: { user } } hoặc trực tiếp user object
+        const userData = response.data?.data || response.data
+        setUser(userData)
         setFormData({
-          displayName: response.data.displayName || '',
-          bio: response.data.bio || '',
+          displayName: userData.displayName || '',
+          bio: userData.bio || '',
         })
       } catch (err) {
         setError('Failed to load profile')
@@ -48,7 +50,8 @@ function ProfilePage() {
       setIsLoading(true)
       setError(null)
       const response = await api.patch('/auth/me', formData)
-      setUser(response.data)
+      const userData = response.data?.data || response.data
+      setUser(userData)
       setSuccess('Profile updated successfully')
       setIsEditing(false)
       setTimeout(() => setSuccess(null), 3000)
