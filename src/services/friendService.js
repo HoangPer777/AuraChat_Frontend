@@ -4,7 +4,13 @@ export async function searchUsers(query) {
   const response = await api.get('/friends/search', {
     params: { q: query },
   })
+  return response.data
+}
 
+export async function discoverUsers(page = 0, size = 20) {
+  const response = await api.get('/friends/discover', {
+    params: { page, size },
+  })
   return response.data
 }
 
