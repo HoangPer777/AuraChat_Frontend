@@ -1,8 +1,48 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import useAuthStore from '../../store/authStore';
+import { clearCallSession, loadCallSession, saveCallSession } from '../../utils/callSession';
+import { publishCallEnd } from '../../services/callService';
 
 export default function IncomingCallPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuthStore();
+  const incomingCall = location.state || loadCallSession();
+
+  if (!incomingCall) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background text-on-background">
+        <div className="text-center space-y-4">
+          <p className="text-lg font-semibold">Không tìm thấy dữ liệu cuộc gọi</p>
+          <button onClick={() => navigate('/test-ui/home')} className="px-4 py-2 rounded-xl bg-primary text-white">Về trang chat</button>
+        </div>
+      </div>
+    )
+  }
+
+  const callerName = incomingCall.callerName || incomingCall.senderName || 'Cuộc gọi đến'
+  const callerAvatar = incomingCall.callerAvatar || incomingCall.senderAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(callerName)}`
+
+  const handleDecline = async () => {
+    try {
+      await publishCallEnd({ callId: incomingCall.callId })
+    } finally {
+      clearCallSession()
+      navigate(-1)
+    }
+  }
+
+  const handleAccept = () => {
+    const acceptedCall = {
+      ...incomingCall,
+      mode: 'incoming',
+      receiverId: incomingCall.receiverId || user?.id,
+    }
+
+    saveCallSession(acceptedCall)
+    navigate('/test-ui/video-call', { state: acceptedCall })
+  }
 
   return (
     <div className="bg-background font-sans text-on-background min-h-screen flex">
@@ -38,20 +78,20 @@ export default function IncomingCallPage() {
             <div className="absolute inset-[-12px] border-2 border-primary/20 rounded-full animate-ping delay-150 opacity-10"></div>
             <div className="w-20 h-20 rounded-full border-2 border-white/10 p-1">
               <img 
-                src="https://i.pravatar.cc/150?u=duong" 
+                src={callerAvatar} 
                 className="w-full h-full rounded-full object-cover" 
-                alt="Caller"
+                alt={callerName}
               />
             </div>
           </div>
 
-          <h3 className="text-white font-bold text-xl mb-1">Lê Thùy Dương</h3>
+          <h3 className="text-white font-bold text-xl mb-1">{callerName}</h3>
           <p className="text-white/50 text-xs font-medium tracking-widest uppercase mb-8">Cuộc gọi video đến</p>
 
           <div className="flex gap-8 items-center justify-center w-full">
             <div className="flex flex-col items-center gap-3">
               <button 
-                onClick={() => navigate(-1)}
+                onClick={handleDecline}
                 className="w-14 h-14 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-all hover:scale-110 active:scale-95 shadow-lg shadow-red-500/20"
               >
                 <span className="material-symbols-outlined text-[28px]">call_end</span>
@@ -60,7 +100,7 @@ export default function IncomingCallPage() {
             </div>
             <div className="flex flex-col items-center gap-3">
               <button 
-                onClick={() => navigate('/test-ui/video-call')}
+                onClick={handleAccept}
                 className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center text-white hover:bg-green-600 transition-all hover:scale-110 active:scale-95 shadow-lg shadow-green-500/20"
               >
                 <span className="material-symbols-outlined text-[28px]">videocam</span>

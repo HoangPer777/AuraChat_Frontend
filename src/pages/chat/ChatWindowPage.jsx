@@ -2,14 +2,28 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 import useChatStore from '../../store/chatStore';
+import useFriendStore from '../../store/friendStore';
 import api from '../../services/api';
+import useIncomingCallNotifications from '../../hooks/useIncomingCallNotifications';
+import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications';
+import { saveCallSession } from '../../utils/callSession';
 
 export default function ChatWindowPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { activeConversation, messages, setMessages, addMessage } = useChatStore();
+  const { friends, loadFriends, isFriend } = useFriendStore();
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
+
+  useIncomingCallNotifications();
+  useFriendRequestNotifications();
+
+  useEffect(() => {
+    if (friends.length === 0) {
+      loadFriends().catch(() => {})
+    }
+  }, [friends.length, loadFriends]);
 
   useEffect(() => {
     if (!activeConversation) {
@@ -19,7 +33,7 @@ export default function ChatWindowPage() {
 
     const fetchMessages = async () => {
       try {
-        const response = await api.get(`/api/conversations/${activeConversation.id}/messages`);
+        const response = await api.get(`/conversations/${activeConversation.id}/messages`);
         if (response.data && response.data.success) {
           setMessages(response.data.data);
         }
@@ -40,7 +54,7 @@ export default function ChatWindowPage() {
     if (!newMessage.trim()) return;
 
     try {
-      const response = await api.post(`/api/conversations/${activeConversation.id}/messages`, {
+      const response = await api.post(`/conversations/${activeConversation.id}/messages`, {
         content: newMessage,
         type: 'TEXT'
       });
@@ -51,6 +65,59 @@ export default function ChatWindowPage() {
     } catch (err) {
       console.error('Error sending message:', err);
     }
+  };
+
+  const getConversationPeer = (conversation) => {
+    if (!conversation) return null;
+
+    if (conversation.receiverId && conversation.receiverId !== user?.id) {
+      return {
+        id: conversation.receiverId,
+        name: conversation.receiverName || conversation.name,
+        avatar: conversation.receiverAvatar || conversation.avatar,
+      };
+    }
+
+    const peerMember = conversation.members?.find((member) => member.userId !== user?.id);
+    if (peerMember) {
+      return {
+        id: peerMember.userId,
+        name: peerMember.displayName || peerMember.name || `User ${peerMember.userId.slice(-6)}`,
+        avatar: peerMember.avatarUrl || peerMember.avatar,
+      };
+    }
+
+    return conversation.type === 'PRIVATE'
+      ? {
+          id: conversation.id,
+          name: conversation.name,
+          avatar: conversation.avatar,
+        }
+      : null;
+  };
+
+  const startVideoCall = () => {
+    if (!activeConversation) return;
+
+    const peer = getConversationPeer(activeConversation);
+    if (!peer?.id) return;
+
+    if (!isFriend(peer.id)) {
+      window.alert('Chỉ có thể gọi sau khi hai bên đã kết bạn.')
+      return
+    }
+
+    const callSession = {
+      mode: 'outgoing',
+      type: 'VIDEO',
+      conversationId: activeConversation.id,
+      receiverId: peer.id,
+      receiverName: peer.name,
+      receiverAvatar: peer.avatar,
+    };
+
+    saveCallSession(callSession);
+    navigate('/test-ui/video-call', { state: callSession });
   };
 
   if (!activeConversation) return null;
@@ -105,10 +172,20 @@ export default function ChatWindowPage() {
               </div>
             </div>
             <div className="flex items-center gap-4 text-on-surface-variant">
-              <button onClick={() => navigate('/test-ui/audio-call')} className="p-2 hover:bg-surface-container-high rounded-full transition-colors">
+                <button
+                  onClick={startVideoCall}
+                  disabled={getConversationPeer(activeConversation)?.id && !isFriend(getConversationPeer(activeConversation).id)}
+                  className="p-2 hover:bg-surface-container-high rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  aria-label="Video call"
+                >
                 <span className="material-symbols-outlined">call</span>
               </button>
-              <button onClick={() => navigate('/test-ui/video-call')} className="p-2 hover:bg-surface-container-high rounded-full transition-colors">
+                <button
+                  onClick={startVideoCall}
+                  disabled={getConversationPeer(activeConversation)?.id && !isFriend(getConversationPeer(activeConversation).id)}
+                  className="p-2 hover:bg-surface-container-high rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  aria-label="Video call"
+                >
                 <span className="material-symbols-outlined">videocam</span>
               </button>
               <button className="p-2 hover:bg-surface-container-high rounded-full transition-colors">

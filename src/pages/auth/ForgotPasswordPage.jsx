@@ -19,7 +19,7 @@ export default function ForgotPasswordPage() {
     setApiSuccess(null);
     setIsLoading(true);
     try {
-      const response = await api.post('/api/auth/forgot-password', {
+      const response = await api.post('/auth/forgot-password', {
         email: data.email
       });
 
@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
     setApiSuccess(null);
     setIsLoading(true);
     try {
-      const response = await api.post('/api/auth/reset-password', {
+      const response = await api.post('/auth/reset-password', {
         email: userEmail,
         otp: data.otp,
         newPassword: data.newPassword

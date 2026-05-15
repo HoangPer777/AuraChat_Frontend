@@ -3,16 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 import useChatStore from '../../store/chatStore';
 import api from '../../services/api';
+import useIncomingCallNotifications from '../../hooks/useIncomingCallNotifications';
+import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { conversations, setConversations, setActiveConversation } = useChatStore();
 
+  useIncomingCallNotifications();
+  useFriendRequestNotifications();
+
   useEffect(() => {
     const fetchConversations = async () => {
       try {
-        const response = await api.get('/api/conversations');
+        const response = await api.get('/conversations');
         if (response.data && response.data.success) {
           setConversations(response.data.data);
         }

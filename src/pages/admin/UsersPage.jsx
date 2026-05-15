@@ -11,7 +11,7 @@ export default function UsersPage() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await api.get('/api/admin/users'); // Hypothetical admin endpoint
+        const response = await api.get('/admin/users'); // Hypothetical admin endpoint
         if (response.data && response.data.success) {
           setUsers(response.data.data);
         } else {

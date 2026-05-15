@@ -19,6 +19,7 @@ import VideoCallPage from './pages/call/VideoCallPage'
 import DashboardPage from './pages/admin/DashboardPage'
 import UsersPage from './pages/admin/UsersPage'
 import ProfilePageNew from './pages/chat/ProfilePage'
+import MediaLibraryPage from './pages/media/MediaLibraryPage'
 
 // Lazy load ProfilePage for code splitting
 const ProfilePage = lazy(() => import('./pages/auth/ProfilePage'))
@@ -46,6 +47,7 @@ function App() {
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/media" element={<MediaLibraryPage />} />
           <Route
             path="/profile"
             element={

@@ -139,6 +139,41 @@ export const validateBio = (bio) => {
 }
 
 /**
+ * Validate media file
+ * Checks file size (max 10 MB) and type based on mode
+ * 
+ * @param {File} file - File object from input
+ * @param {'image'|'file'} mode - Upload mode
+ * @returns {Object} - { isValid: boolean, error: string|null }
+ */
+export const validateMediaFile = (file, mode) => {
+  if (!file) {
+    return { isValid: false, error: 'Vui long chon tep de tai len.' }
+  }
+
+  const maxSize = 10 * 1024 * 1024
+  if (file.size > maxSize) {
+    return { isValid: false, error: 'Dung luong toi da 10MB. Vui long chon tep nho hon.' }
+  }
+
+  if (mode === 'image') {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      return { isValid: false, error: 'Chi ho tro anh JPG, PNG, GIF, WebP.' }
+    }
+    return { isValid: true, error: null }
+  }
+
+  const allowedExtensions = ['pdf', 'docx', 'xlsx', 'txt']
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  if (!extension || !allowedExtensions.includes(extension)) {
+    return { isValid: false, error: 'Chi ho tro PDF, DOCX, XLSX, TXT.' }
+  }
+
+  return { isValid: true, error: null }
+}
+
+/**
  * Validate login form data
  * 
  * @param {Object} formData - Form data object

@@ -42,10 +42,7 @@ export async function connect(onConnected, onDisconnected, onError) {
     stompClient = new Client({
       brokerURL: undefined, // Use webSocketFactory instead
       webSocketFactory: () => {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-        const host = window.location.host
-        const wsUrl = `${protocol}//${host}/ws`
-        return new SockJS(wsUrl)
+        return new SockJS('/ws')
       },
       connectHeaders: {
         Authorization: `Bearer ${accessToken}`,

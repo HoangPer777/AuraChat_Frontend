@@ -23,7 +23,7 @@ export default function LoginPage() {
         if (!result || !result.user) return;
 
         const idToken = await result.user.getIdToken();
-        const response = await api.post('/api/auth/firebase/login', {
+        const response = await api.post('/auth/firebase/login', {
           idToken: idToken
         });
 
@@ -61,7 +61,7 @@ export default function LoginPage() {
     setApiError(null);
     setIsLoading(true);
     try {
-      const response = await api.post('/api/auth/login', {
+      const response = await api.post('/auth/login', {
         email: data.email,
         password: data.password
       });
@@ -95,7 +95,7 @@ export default function LoginPage() {
       const idToken = await result.user.getIdToken();
 
       // Send the token to the backend
-      const response = await api.post('/api/auth/firebase/login', {
+      const response = await api.post('/auth/firebase/login', {
         idToken: idToken
       });
 

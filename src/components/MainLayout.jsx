@@ -62,6 +62,16 @@ function MainLayout({ children }) {
               >
                 Profile
               </Link>
+              <Link
+                to="/media"
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive('/media')
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-700 hover:text-blue-600'
+                }`}
+              >
+                Media
+              </Link>
             </div>
 
             {/* User Menu */}
@@ -108,6 +118,13 @@ function MainLayout({ children }) {
                         onClick={() => setIsUserMenuOpen(false)}
                       >
                         Profile
+                      </Link>
+                      <Link
+                        to="/media"
+                        className="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        Media
                       </Link>
                     </div>
 

@@ -1,23 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
-import api from '../../services/api';
+import useFriendStore from '../../store/friendStore';
+import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications';
+
+const staticNotifications = [
+  { id: 'message-1', type: 'MESSAGE', sender: 'Nguyễn Minh Tú', time: '15 phút trước', read: true, avatar: 'https://i.pravatar.cc/150?u=tu', message: 'đã gửi tin nhắn cho bạn' },
+  { id: 'call-1', type: 'CALL', sender: 'Anh Duy', time: '1 giờ trước', read: true, avatar: 'https://i.pravatar.cc/150?u=duy', message: 'Cuộc gọi nhỡ' },
+  { id: 'system-1', type: 'SYSTEM', sender: 'Hệ thống', time: '3 giờ trước', read: true, icon: 'update', message: 'vừa cập nhật phiên bản mới 2.1.0' },
+]
+
+const formatTimeAgo = (value) => {
+  if (!value) return 'Vừa xong'
+
+  const createdAt = new Date(value)
+  const diffMs = Date.now() - createdAt.getTime()
+  const diffMinutes = Math.max(1, Math.floor(diffMs / 60000))
+
+  if (diffMinutes < 60) return `${diffMinutes} phút trước`
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return `${diffHours} giờ trước`
+  const diffDays = Math.floor(diffHours / 24)
+  return `${diffDays} ngày trước`
+}
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState('all');
+  const { pendingRequests, loadPendingRequests, acceptRequest, declineRequest } = useFriendStore();
+
+  useFriendRequestNotifications();
 
   useEffect(() => {
-    // Mock data
-    setNotifications([
-      { id: 1, type: 'FRIEND_REQUEST', sender: 'Linh Chi', time: '2 phút trước', read: false, avatar: 'https://i.pravatar.cc/150?u=chi', message: 'đã gửi lời mời kết bạn' },
-      { id: 2, type: 'MESSAGE', sender: 'Nguyễn Minh Tú', time: '15 phút trước', read: true, avatar: 'https://i.pravatar.cc/150?u=tu', message: 'đã gửi tin nhắn cho bạn' },
-      { id: 3, type: 'CALL', sender: 'Anh Duy', time: '1 giờ trước', read: true, avatar: 'https://i.pravatar.cc/150?u=duy', message: 'Cuộc gọi nhỡ' },
-      { id: 4, type: 'SYSTEM', sender: 'Hệ thống', time: '3 giờ trước', read: true, icon: 'update', message: 'vừa cập nhật phiên bản mới 2.1.0' },
-    ]);
-  }, []);
+    loadPendingRequests().catch(() => {})
+  }, [loadPendingRequests]);
+
+  const notifications = useMemo(() => {
+    const friendNotifications = pendingRequests.map((request) => ({
+      id: request.id,
+      type: 'FRIEND_REQUEST',
+      sender: request.sender ? request.sender.displayName : 'Lời mời kết bạn',
+      time: formatTimeAgo(request.createdAt),
+      read: false,
+      avatar: request.sender?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(request.sender?.displayName || 'User')}`,
+      message: 'đã gửi lời mời kết bạn',
+      requestId: request.id,
+    }))
+
+    return [...friendNotifications, ...staticNotifications]
+  }, [pendingRequests])
 
   const filteredNotifs = filter === 'all' ? notifications : notifications.filter(n => n.type === filter.toUpperCase());
 
@@ -67,8 +99,8 @@ export default function NotificationsPage() {
         </header>
         <div className="flex-1 overflow-y-auto">
           {filteredNotifs.map(notif => (
-            <div key={notif.id} className={`p-4 cursor-pointer hover:bg-surface-container-low transition-all border-b border-outline-variant/30 ${!notif.read ? 'bg-primary/5 border-l-4 border-primary' : ''}`}>
-              <div className="flex gap-3">
+            <div key={notif.id} className={`p-4 hover:bg-surface-container-low transition-all border-b border-outline-variant/30 ${!notif.read ? 'bg-primary/5 border-l-4 border-primary' : ''}`}>
+              <div className="flex gap-3 items-center">
                 <div className="relative shrink-0">
                   {notif.avatar ? (
                     <img src={notif.avatar} className="w-12 h-12 rounded-full object-cover" alt={notif.sender} />
@@ -85,7 +117,40 @@ export default function NotificationsPage() {
                   </p>
                   <p className="text-[10px] text-outline mt-1">{notif.time}</p>
                 </div>
-                {!notif.read && <div className="w-2 h-2 bg-primary rounded-full mt-2"></div>}
+                {notif.type === 'FRIEND_REQUEST' ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        try {
+                          await acceptRequest(notif.requestId)
+                        } catch (err) {
+                          console.error('Accept friend request failed', err)
+                        }
+                      }}
+                      className="text-primary p-2 hover:bg-primary/10 rounded-full"
+                      aria-label="Chấp nhận"
+                    >
+                      <span className="material-symbols-outlined">check_circle</span>
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        try {
+                          await declineRequest(notif.requestId)
+                        } catch (err) {
+                          console.error('Decline friend request failed', err)
+                        }
+                      }}
+                      className="text-error p-2 hover:bg-error/10 rounded-full"
+                      aria-label="Từ chối"
+                    >
+                      <span className="material-symbols-outlined">cancel</span>
+                    </button>
+                  </div>
+                ) : (
+                  (!notif.read && <div className="w-2 h-2 bg-primary rounded-full mt-2"></div>)
+                )}
               </div>
             </div>
           ))}
