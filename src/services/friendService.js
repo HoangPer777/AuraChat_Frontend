@@ -43,3 +43,8 @@ export async function unfriend(friendId) {
   const response = await api.delete(`/friends/${friendId}`)
   return response.data
 }
+
+export async function createPrivateConversation(receiverId) {
+  const response = await api.post('/conversations', { receiverId, type: 'PRIVATE' })
+  return response.data
+}

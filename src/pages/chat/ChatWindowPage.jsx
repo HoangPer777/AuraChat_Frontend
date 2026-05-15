@@ -4,6 +4,7 @@ import useAuthStore from '../../store/authStore';
 import useChatStore from '../../store/chatStore';
 import useFriendStore from '../../store/friendStore';
 import api from '../../services/api';
+import { createPrivateConversation } from '../../services/friendService';
 import useIncomingCallNotifications from '../../hooks/useIncomingCallNotifications';
 import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications';
 import { saveCallSession } from '../../utils/callSession';
@@ -104,8 +105,41 @@ export default function ChatWindowPage() {
     const matchedConversation = findPrivateConversationByFriendId(conversations, friendId);
     if (matchedConversation && matchedConversation.id !== activeConversation?.id) {
       setActiveConversation(matchedConversation);
+      return;
     }
-  }, [activeConversation, conversations, friendId, setActiveConversation]);
+
+    // Conversation not found, try to create one
+    if (!matchedConversation && friendId) {
+      const createConversation = async () => {
+        try {
+          const response = await createPrivateConversation(friendId);
+          if (response?.success && response?.data) {
+            setActiveConversation(response.data);
+          }
+        } catch (err) {
+          // Backend endpoint not found, create mock conversation object
+          console.log('Creating mock conversation for friendId:', friendId);
+          
+          const friend = friends.find(f => f.id === friendId);
+          const mockConversation = {
+            id: `temp_${friendId}`,
+            type: 'PRIVATE',
+            receiverId: friendId,
+            receiverName: friend?.displayName || `User ${friendId.slice(-6)}`,
+            receiverAvatar: friend?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(friend?.displayName || 'User')}`,
+            name: friend?.displayName || `User ${friendId.slice(-6)}`,
+            avatar: friend?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(friend?.displayName || 'User')}`,
+            members: [],
+            lastMessage: null,
+            isOnline: false,
+          };
+          setActiveConversation(mockConversation);
+        }
+      };
+      
+      createConversation();
+    }
+  }, [activeConversation, conversations, friendId, setActiveConversation, friends]);
 
   useEffect(() => {
     if (!isResolvingConversation && !activeConversation) {
@@ -121,8 +155,25 @@ export default function ChatWindowPage() {
     e.preventDefault();
     if (!newMessage.trim()) return;
 
+    let conversationId = activeConversation?.id;
+
+    // If conversation is temporary (mock), try to create it first
+    if (conversationId?.startsWith('temp_')) {
+      try {
+        const response = await createPrivateConversation(activeConversation.receiverId);
+        if (response?.success && response?.data?.id) {
+          conversationId = response.data.id;
+          setActiveConversation(response.data);
+        }
+      } catch (err) {
+        console.error('Failed to create conversation:', err);
+        window.alert('Không thể tạo cuộc trò chuyện. Vui lòng thử lại.');
+        return;
+      }
+    }
+
     try {
-      const response = await api.post(`/conversations/${activeConversation.id}/messages`, {
+      const response = await api.post(`/conversations/${conversationId}/messages`, {
         content: newMessage,
         type: 'TEXT'
       });
