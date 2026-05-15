@@ -329,7 +329,7 @@ export default function FriendsPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => navigate('/chat', { state: { friendId: friend.id } })}
+                    onClick={() => navigate(`/test-ui/chat?friendId=${encodeURIComponent(friend.id)}`)}
                     className="text-primary p-1.5 hover:bg-primary/10 rounded-full transition-colors"
                     aria-label="Nhắn tin"
                   >
@@ -427,7 +427,7 @@ export default function FriendsPage() {
                     user={u}
                     isFriend={isFriend(u.id)}
                     onAddFriend={handleAddFriend}
-                    onChat={(id) => navigate('/chat', { state: { friendId: id } })}
+                    onChat={(id) => navigate(`/test-ui/chat?friendId=${encodeURIComponent(id)}`)}
                   />
                 ))}
               </div>

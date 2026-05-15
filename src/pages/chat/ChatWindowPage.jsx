@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 import useChatStore from '../../store/chatStore';
 import useFriendStore from '../../store/friendStore';
@@ -10,11 +10,43 @@ import { saveCallSession } from '../../utils/callSession';
 
 export default function ChatWindowPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
-  const { activeConversation, messages, setMessages, addMessage } = useChatStore();
+  const { conversations, setConversations, activeConversation, setActiveConversation, messages, setMessages, addMessage } = useChatStore();
   const { friends, loadFriends, isFriend } = useFriendStore();
   const [newMessage, setNewMessage] = useState('');
+  const [isResolvingConversation, setIsResolvingConversation] = useState(true);
   const messagesEndRef = useRef(null);
+
+  const friendId = searchParams.get('friendId') || location.state?.friendId || null;
+
+  const getConversationPeerId = (conversation) => {
+    if (!conversation) return null;
+
+    if (conversation.receiverId && conversation.receiverId !== user?.id) {
+      return conversation.receiverId;
+    }
+
+    const peerMember = conversation.members?.find((member) => member.userId !== user?.id);
+    if (peerMember?.userId) {
+      return peerMember.userId;
+    }
+
+    return null;
+  };
+
+  const findPrivateConversationByFriendId = (conversationList, targetFriendId) =>
+    conversationList.find((conversation) => {
+      if (!conversation || conversation.type !== 'PRIVATE') return false;
+
+      if (conversation.receiverId === targetFriendId) return true;
+
+      const peerId = getConversationPeerId(conversation);
+      if (peerId === targetFriendId) return true;
+
+      return conversation.id === targetFriendId;
+    }) || null;
 
   useIncomingCallNotifications();
   useFriendRequestNotifications();
@@ -26,12 +58,9 @@ export default function ChatWindowPage() {
   }, [friends.length, loadFriends]);
 
   useEffect(() => {
-    if (!activeConversation) {
-      navigate('/test-ui/home');
-      return;
-    }
-
     const fetchMessages = async () => {
+      if (!activeConversation) return;
+
       try {
         const response = await api.get(`/conversations/${activeConversation.id}/messages`);
         if (response.data && response.data.success) {
@@ -43,7 +72,46 @@ export default function ChatWindowPage() {
     };
 
     fetchMessages();
-  }, [activeConversation, setMessages, navigate]);
+  }, [activeConversation, setMessages]);
+
+  useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        const response = await api.get('/conversations');
+        if (response.data && response.data.success) {
+          setConversations(response.data.data || []);
+        }
+      } catch (err) {
+        console.error('Error fetching conversations:', err);
+      } finally {
+        setIsResolvingConversation(false);
+      }
+    };
+
+    fetchConversations();
+  }, [setConversations]);
+
+  useEffect(() => {
+    if (!friendId) {
+      return;
+    }
+
+    const activePeerId = getConversationPeerId(activeConversation);
+    if (activePeerId === friendId) {
+      return;
+    }
+
+    const matchedConversation = findPrivateConversationByFriendId(conversations, friendId);
+    if (matchedConversation && matchedConversation.id !== activeConversation?.id) {
+      setActiveConversation(matchedConversation);
+    }
+  }, [activeConversation, conversations, friendId, setActiveConversation]);
+
+  useEffect(() => {
+    if (!isResolvingConversation && !activeConversation) {
+      navigate('/test-ui/home');
+    }
+  }, [activeConversation, isResolvingConversation, navigate]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
