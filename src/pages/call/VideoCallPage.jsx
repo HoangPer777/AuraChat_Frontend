@@ -26,6 +26,18 @@ export default function VideoCallPage() {
   const { user } = useAuthStore()
   const callIntent = useMemo(() => location.state || loadCallSession(), [location.state])
   const [timer, setTimer] = useState(0)
+  const [callStartedAt, setCallStartedAt] = useState(() => {
+    const timestamp =
+      callIntent?.connectedAt ||
+      callIntent?.acceptedAt ||
+      callIntent?.startedAt ||
+      callIntent?.createdAt
+
+    if (!timestamp) return null
+
+    const parsed = new Date(timestamp).getTime()
+    return Number.isNaN(parsed) ? null : parsed
+  })
   const [isMicOn, setIsMicOn] = useState(true)
   const [isCamOn, setIsCamOn] = useState(true)
   const [callStatus, setCallStatus] = useState('connecting')
@@ -34,21 +46,31 @@ export default function VideoCallPage() {
   const remoteVideoRef = useRef(null)
   const localStreamRef = useRef(null)
   const peerConnectionRef = useRef(null)
-  const pendingCandidatesRef = useRef([])
-  const callIdRef = useRef(callIntent?.callId || generateCallId())
+  const pendingRemoteCandidatesRef = useRef([])
+  const pendingLocalCandidatesRef = useRef([])
+  const callIdRef = useRef(callIntent?.callId || null)
 
   useEffect(() => {
     if (!callIntent) {
       navigate('/test-ui/home', { replace: true })
+    }
+  }, [callIntent, navigate])
+
+  useEffect(() => {
+    if (callStatus !== 'connected' || !callStartedAt) {
+      setTimer(0)
       return undefined
     }
 
-    const interval = setInterval(() => {
-      setTimer((prev) => prev + 1)
-    }, 1000)
+    const updateTimer = () => {
+      const elapsed = Math.max(0, Math.floor((Date.now() - callStartedAt) / 1000))
+      setTimer(elapsed)
+    }
 
+    updateTimer()
+    const interval = setInterval(updateTimer, 1000)
     return () => clearInterval(interval)
-  }, [callIntent, navigate])
+  }, [callStartedAt, callStatus])
 
   useEffect(() => {
     if (!callIntent) return undefined
@@ -76,11 +98,88 @@ export default function VideoCallPage() {
       }
     }
 
+    const resolveTimestampMs = (...values) => {
+      for (const value of values) {
+        if (!value) continue
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          return value
+        }
+
+        const parsed = new Date(value).getTime()
+        if (!Number.isNaN(parsed)) {
+          return parsed
+        }
+      }
+
+      return Date.now()
+    }
+
+    const syncConnectedTime = (...candidates) => {
+      const nextStartedAt = resolveTimestampMs(...candidates)
+
+      setCallStartedAt((prev) => {
+        if (!prev) return nextStartedAt
+
+        // Prefer the new timestamp if drift is large enough to indicate unsynced clocks.
+        if (Math.abs(prev - nextStartedAt) > 2000) {
+          return nextStartedAt
+        }
+
+        return prev
+      })
+
+      const connectedAtIso = new Date(nextStartedAt).toISOString()
+      saveCallSession({
+        ...callIntent,
+        callId: callIdRef.current,
+        connectedAt: connectedAtIso,
+      })
+    }
+
+    const flushBufferedLocalCandidates = () => {
+      if (!callIdRef.current || pendingLocalCandidatesRef.current.length === 0) {
+        return
+      }
+
+      const receiverId = callIntent.mode === 'incoming' ? callIntent.callerId : callIntent.receiverId
+      if (!receiverId) return
+
+      const queuedCandidates = [...pendingLocalCandidatesRef.current]
+      pendingLocalCandidatesRef.current = []
+
+      queuedCandidates.forEach((candidate) => {
+        const published = publishIceCandidate({
+          callId: callIdRef.current,
+          senderId: user?.id,
+          receiverId,
+          candidate: candidate.candidate,
+          sdpMid: candidate.sdpMid,
+          sdpMLineIndex: candidate.sdpMLineIndex,
+        })
+
+        if (!published) {
+          pendingLocalCandidatesRef.current.push(candidate)
+        }
+      })
+    }
+
+    const resolveCallId = (nextCallId) => {
+      if (!nextCallId) return
+      if (callIdRef.current === nextCallId) {
+        flushBufferedLocalCandidates()
+        return
+      }
+
+      callIdRef.current = nextCallId
+      saveCallSession({ ...callIntent, callId: nextCallId })
+      flushBufferedLocalCandidates()
+    }
+
     const flushBufferedCandidates = async () => {
       const peerConnection = peerConnectionRef.current
       if (!peerConnection || !peerConnection.remoteDescription) return
 
-      for (const candidate of pendingCandidatesRef.current) {
+      for (const candidate of pendingRemoteCandidatesRef.current) {
         try {
           await peerConnection.addIceCandidate(candidate)
         } catch (error) {
@@ -88,18 +187,44 @@ export default function VideoCallPage() {
         }
       }
 
-      pendingCandidatesRef.current = []
+      pendingRemoteCandidatesRef.current = []
+    }
+
+    const isMessageForCurrentCall = (message) => {
+      if (!message) return false
+
+      if (callIntent.mode === 'incoming') {
+        if (!callIdRef.current || !message.callId) return true
+        return message.callId === callIdRef.current
+      }
+
+      if (message.callerId && message.callerId !== user?.id) return false
+      if (message.senderId && message.senderId !== callIntent.receiverId) return false
+
+      if (
+        message.receiverId &&
+        message.receiverId !== user?.id &&
+        message.receiverId !== callIntent.receiverId
+      ) {
+        return false
+      }
+
+      if (message.callId && callIdRef.current && message.callId !== callIdRef.current) {
+        return false
+      }
+
+      return true
     }
 
     const handleCallMessage = async (message) => {
       if (!mounted || !message) return
 
-      if (message.callId && message.callId !== callIdRef.current && message.receiverId !== user?.id) {
+      if (!isMessageForCurrentCall(message)) {
         return
       }
 
-      if (message.callId && !callIdRef.current) {
-        callIdRef.current = message.callId
+      if (message.callId) {
+        resolveCallId(message.callId)
       }
 
       if (message.candidate) {
@@ -117,7 +242,7 @@ export default function VideoCallPage() {
             console.warn('Error adding ICE candidate:', error)
           })
         } else {
-          pendingCandidatesRef.current.push(iceCandidate)
+          pendingRemoteCandidatesRef.current.push(iceCandidate)
         }
 
         return
@@ -137,6 +262,7 @@ export default function VideoCallPage() {
 
         await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: message.sdp }))
         await flushBufferedCandidates()
+        syncConnectedTime(message.acceptedAt, message.startedAt, message.createdAt)
         setCallStatus('connected')
         setStatusText('Cuộc gọi đã được kết nối')
       }
@@ -156,16 +282,28 @@ export default function VideoCallPage() {
     }
 
     const sendIceCandidate = (candidate) => {
-      if (!callIdRef.current) return
+      if (!candidate) return
 
-      publishIceCandidate({
+      if (!callIdRef.current) {
+        pendingLocalCandidatesRef.current.push(candidate)
+        return
+      }
+
+      const receiverId = callIntent.mode === 'incoming' ? callIntent.callerId : callIntent.receiverId
+      if (!receiverId) return
+
+      const published = publishIceCandidate({
         callId: callIdRef.current,
         senderId: user?.id,
-        receiverId: callIntent.mode === 'incoming' ? callIntent.callerId : callIntent.receiverId,
+        receiverId,
         candidate: candidate.candidate,
         sdpMid: candidate.sdpMid,
         sdpMLineIndex: candidate.sdpMLineIndex,
       })
+
+      if (!published) {
+        pendingLocalCandidatesRef.current.push(candidate)
+      }
     }
 
     const createConnection = async () => {
@@ -182,6 +320,7 @@ export default function VideoCallPage() {
           if (state === 'connected') {
             setCallStatus('connected')
             setStatusText('Cuộc gọi đã kết nối')
+            syncConnectedTime(callIntent.connectedAt, callIntent.acceptedAt)
           }
 
           if (state === 'failed' || state === 'disconnected' || state === 'closed') {
@@ -194,15 +333,19 @@ export default function VideoCallPage() {
       localStream.getTracks().forEach((track) => peerConnection.addTrack(track, localStream))
 
       if (callIntent.mode === 'incoming') {
+        resolveCallId(callIntent.callId)
         await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: callIntent.sdp }))
         const answer = await peerConnection.createAnswer()
         await peerConnection.setLocalDescription(answer)
 
-        const published = publishCallAnswer({
+        const acceptedAt = new Date().toISOString()
+
+        const published = await publishCallAnswer({
           callId: callIntent.callId,
           callerId: callIntent.callerId,
           receiverId: callIntent.receiverId || user?.id,
           sdp: answer.sdp,
+          acceptedAt,
         })
 
         if (!published) {
@@ -211,13 +354,13 @@ export default function VideoCallPage() {
 
         setCallStatus('connected')
         setStatusText('Đã chấp nhận cuộc gọi')
+        syncConnectedTime(acceptedAt)
         await flushBufferedCandidates()
       } else {
         const offer = await peerConnection.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true })
         await peerConnection.setLocalDescription(offer)
 
-        const published = publishCallOffer({
-          callId: callIdRef.current,
+        const published = await publishCallOffer({
           receiverId: callIntent.receiverId,
           type: callIntent.type || 'VIDEO',
           conversationId: callIntent.conversationId,
@@ -230,7 +373,11 @@ export default function VideoCallPage() {
 
         setCallStatus('ringing')
         setStatusText('Đang đổ chuông...')
-        saveCallSession({ ...callIntent, callId: callIdRef.current })
+        saveCallSession({
+          ...callIntent,
+          clientCallId: generateCallId(),
+          createdAt: new Date().toISOString(),
+        })
       }
     }
 

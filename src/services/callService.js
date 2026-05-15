@@ -33,18 +33,18 @@ export async function getLocalStream(kind = 'VIDEO') {
   return navigator.mediaDevices.getUserMedia(constraints)
 }
 
-export async function publishCallOffer(payload) {
+export function publishCallOffer(payload) {
   return send('/app/call/offer', payload)
 }
 
-export async function publishCallAnswer(payload) {
+export function publishCallAnswer(payload) {
   return send('/app/call/answer', payload)
 }
 
-export async function publishIceCandidate(payload) {
+export function publishIceCandidate(payload) {
   return send('/app/call/ice-candidate', payload)
 }
 
-export async function publishCallEnd(payload) {
+export function publishCallEnd(payload) {
   return send('/app/call/end', payload)
 }

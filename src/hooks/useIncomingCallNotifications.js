@@ -35,6 +35,9 @@ export default function useIncomingCallNotifications() {
             conversationId: message.conversationId,
             type: message.type || 'VIDEO',
             sdp: message.sdp,
+            createdAt: message.createdAt,
+            startedAt: message.startedAt,
+            acceptedAt: message.acceptedAt,
             callerName: message.callerName || message.senderName || 'Cuộc gọi đến',
             callerAvatar: message.callerAvatar || message.senderAvatar || '',
           })
