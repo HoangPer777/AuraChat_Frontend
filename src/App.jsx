@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
 import ProtectedRoute from './components/ProtectedRoute'
+import useAuthStore from './store/authStore'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
@@ -35,12 +36,16 @@ function LoadingFallback() {
 }
 
 function App() {
+  const { accessToken } = useAuthStore()
+  // Fallback to localStorage so the check works even before Zustand hydrates
+  const isAuthenticated = !!(accessToken || localStorage.getItem('accessToken'))
+
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        {/* Public Routes — redirect to /chat if already logged in */}
+        <Route path="/login" element={isAuthenticated ? <Navigate to="/chat" replace /> : <LoginPage />} />
+        <Route path="/register" element={isAuthenticated ? <Navigate to="/chat" replace /> : <RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         <Route path="/oauth/callback" element={<OAuth2CallbackPage />} />

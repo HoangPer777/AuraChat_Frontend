@@ -22,7 +22,9 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       const { data } = await api.post('/auth/register', form)
-      setAuth(data.user, data.accessToken, data.refreshToken)
+      // Backend wraps response in DataResponse: { success, data: { accessToken, refreshToken, user } }
+      const payload = data?.data ?? data
+      setAuth(payload.user, payload.accessToken, payload.refreshToken)
       navigate('/chat')
     } catch (err) {
       setError(err.response?.data?.message || 'Đăng ký thất bại, vui lòng thử lại')

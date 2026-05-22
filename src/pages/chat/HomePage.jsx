@@ -5,14 +5,16 @@ import useChatStore from '../../store/chatStore';
 import api from '../../services/api';
 import useIncomingCallNotifications from '../../hooks/useIncomingCallNotifications';
 import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications';
+import useChatWebSocket from '../../hooks/useChatWebSocket';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { conversations, setConversations, setActiveConversation } = useChatStore();
+  const { conversations, setConversations, setActiveConversation, isOnline } = useChatStore();
 
   useIncomingCallNotifications();
   useFriendRequestNotifications();
+  useChatWebSocket();
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -32,6 +34,45 @@ export default function HomePage() {
   const handleConversationClick = (conversation) => {
     setActiveConversation(conversation);
     navigate('/test-ui/chat');
+  };
+
+  // Lấy tên hiển thị của conversation
+  const getConvName = (conv) => {
+    if (conv.name) return conv.name;
+    if (conv.type === 'PRIVATE' && conv.members) {
+      const other = conv.members.find(m => m.userId !== user?.id);
+      return other?.displayName || (other ? `User ${other.userId.slice(-6)}` : 'Chat');
+    }
+    return 'Conversation';
+  };
+
+  // Lấy avatar của conversation
+  const getConvAvatar = (conv) => {
+    if (conv.avatarUrl) return conv.avatarUrl;
+    if (conv.type === 'PRIVATE' && conv.members) {
+      const other = conv.members.find(m => m.userId !== user?.id);
+      if (other?.avatarUrl) return other.avatarUrl;
+    }
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(getConvName(conv))}`;
+  };
+
+  // Lấy preview tin nhắn cuối
+  const getLastMessagePreview = (conv) => {
+    if (!conv.lastMessage) return 'Chưa có tin nhắn';
+    return conv.lastMessage.content || 'Đã gửi một tin nhắn';
+  };
+
+  // Format thời gian
+  const formatTime = (isoString) => {
+    if (!isoString) return '';
+    return new Date(isoString).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Lấy peerId của PRIVATE conversation để check online status
+  const getConvPeerId = (conv) => {
+    if (conv.type !== 'PRIVATE') return null;
+    const other = conv.members?.find(m => m.userId !== user?.id);
+    return other?.userId || null;
   };
 
   return (
@@ -83,24 +124,31 @@ export default function HomePage() {
         </div>
         <div className="flex-1 overflow-y-auto px-2 space-y-1">
           {conversations.length > 0 ? (
-            conversations.map((conv) => (
-              <div key={conv.id} onClick={() => handleConversationClick(conv)} className="p-3 flex items-center gap-3 hover:bg-surface-container-low cursor-pointer rounded-xl transition-all">
-                <div className="relative shrink-0">
-                  <img alt={conv.name} className="w-12 h-12 rounded-full object-cover" src={conv.avatar || "https://ui-avatars.com/api/?name=" + conv.name} />
-                  {conv.isOnline && <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-surface-container rounded-full"></div>}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-baseline">
-                    <h3 className="font-semibold text-on-surface truncate">{conv.name}</h3>
-                    <span className="text-[11px] text-outline">{conv.lastMessageTime}</span>
+            conversations.map((conv) => {
+              const convName = getConvName(conv);
+              const convAvatar = getConvAvatar(conv);
+              const lastMsg = getLastMessagePreview(conv);
+              const lastTime = formatTime(conv.lastMessage?.sentAt || conv.updatedAt);
+              const peerId = getConvPeerId(conv);
+              const peerOnline = peerId ? isOnline(peerId) : false;
+              return (
+                <div key={conv.id} onClick={() => handleConversationClick(conv)} className="p-3 flex items-center gap-3 hover:bg-surface-container-low cursor-pointer rounded-xl transition-all">
+                  <div className="relative shrink-0">
+                    <img alt={convName} className="w-12 h-12 rounded-full object-cover" src={convAvatar} />
+                    {peerOnline && <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-surface-container rounded-full"></div>}
                   </div>
-                  <div className="flex justify-between items-center mt-0.5">
-                    <p className="text-xs text-on-surface-variant truncate">{conv.lastMessage}</p>
-                    {conv.unreadCount > 0 && <span className="bg-primary text-white text-[11px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{conv.unreadCount}</span>}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-baseline">
+                      <h3 className="font-semibold text-on-surface truncate">{convName}</h3>
+                      <span className="text-[11px] text-outline">{lastTime}</span>
+                    </div>
+                    <div className="flex justify-between items-center mt-0.5">
+                      <p className="text-xs text-on-surface-variant truncate">{lastMsg}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <p className="text-center text-outline py-8 text-sm">Chưa có hội thoại nào</p>
           )}

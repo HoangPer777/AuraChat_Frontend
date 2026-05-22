@@ -7,6 +7,7 @@ import api from '../../services/api';
 import { createPrivateConversation } from '../../services/friendService';
 import useIncomingCallNotifications from '../../hooks/useIncomingCallNotifications';
 import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications';
+import useChatWebSocket from '../../hooks/useChatWebSocket';
 import { saveCallSession } from '../../utils/callSession';
 
 export default function ChatWindowPage() {
@@ -51,6 +52,7 @@ export default function ChatWindowPage() {
 
   useIncomingCallNotifications();
   useFriendRequestNotifications();
+  useChatWebSocket();
 
   useEffect(() => {
     if (friends.length === 0) {
@@ -239,6 +241,11 @@ export default function ChatWindowPage() {
     navigate('/test-ui/video-call', { state: callSession });
   };
 
+  const formatTime = (isoString) => {
+    if (!isoString) return '';
+    return new Date(isoString).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  };
+
   if (!activeConversation) return null;
 
   return (
@@ -324,7 +331,7 @@ export default function ChatWindowPage() {
                   )}
                   <div className={`${isMe ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface'} p-3 rounded-2xl ${isMe ? 'rounded-br-none' : 'rounded-bl-none'} shadow-sm`}>
                     {msg.content}
-                    <span className={`block text-[10px] ${isMe ? 'text-white/70' : 'text-outline'} mt-1 text-right`}>{msg.time}</span>
+                    <span className={`block text-[10px] ${isMe ? 'text-white/70' : 'text-outline'} mt-1 text-right`}>{formatTime(msg.createdAt)}</span>
                   </div>
                 </div>
               );
