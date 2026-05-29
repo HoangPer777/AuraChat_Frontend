@@ -7,9 +7,11 @@ services:
     restart: unless-stopped
     ports:
       - "3000:80"
+    env_file:
+      - .env
     environment:
-      - VITE_API_URL=${VITE_API_URL:-https://aura-chat.io.vn}
-      - VITE_WS_URL=${VITE_WS_URL:-wss://aura-chat.io.vn}
+      - VITE_API_URL=http://aura-chat.io.vn:8080
+      - VITE_WS_URL=ws://aura-chat.io.vn:8080
       # Dev local: backend chạy trên máy host
       # Deploy production: trỏ về domain backend đã có HTTPS
-      - BACKEND_URL=${BACKEND_URL:-https://aura-chat.io.vn}
+      - BACKEND_URL=http://aura-chat.io.vn:8080
