@@ -7,11 +7,11 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://aura-chat.io.vn:8080',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'http://localhost:8080',
+        target: 'ws://aura-chat.io.vn:8080',
         ws: true,
         changeOrigin: true,
       },
