@@ -15,13 +15,15 @@ import { create } from 'zustand'
  * - Fetched from backend API on each session
  * - Updated in real-time via WebSocket events
  */
-const useChatStore = create((set) => ({
+const useChatStore = create((set, get) => ({
   // State
   conversations: [],
   activeConversation: null,
   messages: [],
   isLoading: false,
   error: null,
+  /** Set of userIds currently online */
+  onlineUsers: new Set(),
 
   // Actions
   /**
@@ -56,6 +58,33 @@ const useChatStore = create((set) => ({
         msg.id === messageId ? { ...msg, ...updates } : msg
       ),
     })),
+
+  /**
+   * Update lastMessage of a conversation in the list (called on real-time message receipt).
+   */
+  updateConversationLastMessage: (conversationId, lastMessage) =>
+    set((state) => ({
+      conversations: state.conversations.map((conv) =>
+        conv.id === conversationId
+          ? { ...conv, lastMessage, updatedAt: lastMessage.sentAt }
+          : conv
+      ),
+    })),
+
+  /**
+   * Update online status of a friend (called on presence WebSocket event).
+   */
+  setFriendOnlineStatus: (userId, isOnline) =>
+    set((state) => ({
+      onlineUsers: isOnline
+        ? new Set([...state.onlineUsers, userId])
+        : new Set([...state.onlineUsers].filter((id) => id !== userId)),
+    })),
+
+  /**
+   * Check if a user is online.
+   */
+  isOnline: (userId) => get().onlineUsers.has(userId),
 
   /**
    * Set loading state for chat operations

@@ -6,6 +6,7 @@ import useFriendStore from '../../store/friendStore';
 import api from '../../services/api';
 import useIncomingCallNotifications from '../../hooks/useIncomingCallNotifications';
 import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications';
+import useChatWebSocket from '../../hooks/useChatWebSocket';
 import { saveCallSession } from '../../utils/callSession';
 
 export default function ChatPage() {
@@ -18,6 +19,7 @@ export default function ChatPage() {
 
   useIncomingCallNotifications();
   useFriendRequestNotifications();
+  useChatWebSocket();
 
   useEffect(() => {
     if (friends.length === 0) {
@@ -145,7 +147,8 @@ export default function ChatPage() {
     if (conv.name) return conv.name;
     if (conv.type === 'PRIVATE' && conv.members) {
       const other = conv.members.find(m => m.userId !== user?.id);
-      return other ? `User ${other.userId.slice(-6)}` : 'Chat';
+      // Backend giờ trả về displayName trong MemberDto
+      return other?.displayName || (other ? `User ${other.userId.slice(-6)}` : 'Chat');
     }
     return 'Conversation';
   };
