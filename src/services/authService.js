@@ -25,12 +25,14 @@ import useAuthStore from '../store/authStore'
 export const firebaseLogin = async (idToken) => {
   try {
     const response = await api.post('/auth/firebase/login', { idToken })
-    const { accessToken, refreshToken, user } = response.data
+    // Backend wraps response in DataResponse: { success, data: { accessToken, refreshToken, user } }
+    const payload = response.data?.data ?? response.data
+    const { accessToken, refreshToken, user } = payload
     
     // Store auth data
     storeAuthData({ accessToken, refreshToken, user })
     
-    return response.data
+    return payload
   } catch (error) {
     throw new Error(error.response?.data?.message || 'Firebase login failed')
   }
@@ -92,7 +94,9 @@ export const refreshAccessToken = async () => {
     }
 
     const response = await api.post('/auth/refresh', { refreshToken })
-    const { accessToken, refreshToken: newRefreshToken } = response.data
+    // Backend wraps response in DataResponse: { success, data: { accessToken, refreshToken, user } }
+    const payload = response.data?.data ?? response.data
+    const { accessToken, refreshToken: newRefreshToken } = payload
     
     // Update tokens in localStorage and store
     localStorage.setItem('accessToken', accessToken)

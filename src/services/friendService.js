@@ -45,6 +45,6 @@ export async function unfriend(friendId) {
 }
 
 export async function createPrivateConversation(receiverId) {
-  const response = await api.post('/conversations', { receiverId, type: 'PRIVATE' })
+  const response = await api.post('/conversations', { targetUserId: receiverId, type: 'PRIVATE' })
   return response.data
 }

@@ -101,8 +101,10 @@ api.interceptors.response.use(
           { refreshToken }
         )
 
-        const newAccessToken = data.accessToken
-        const newRefreshToken = data.refreshToken
+        // Backend wraps response in DataResponse: { success, data: { accessToken, refreshToken, user } }
+        const payload = data?.data ?? data
+        const newAccessToken = payload.accessToken
+        const newRefreshToken = payload.refreshToken
 
         // Update tokens in localStorage
         localStorage.setItem('accessToken', newAccessToken)

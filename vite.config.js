@@ -5,6 +5,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    // Firebase popup (signInWithPopup) requires Cross-Origin-Opener-Policy: unsafe-none
+    // Without this, Chrome blocks window.closed checks and the popup flow fails
+    headers: {
+      'Cross-Origin-Opener-Policy': 'unsafe-none',
+      'Cross-Origin-Embedder-Policy': 'unsafe-none',
+    },
     proxy: {
       '/api': {
         target: 'http://aura-chat.io.vn:8080',
