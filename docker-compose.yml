@@ -8,8 +8,8 @@ services:
     ports:
       - "3000:80"
     environment:
-      - VITE_API_URL=${VITE_API_URL:-http://aura-chat.io.vn:8080}
-      - VITE_WS_URL=${VITE_WS_URL:-ws://aura-chat.io.vn:8080}
+      - VITE_API_URL=${VITE_API_URL:-https://aura-chat.io.vn}
+      - VITE_WS_URL=${VITE_WS_URL:-wss://aura-chat.io.vn}
       # Dev local: backend chạy trên máy host
-      # Deploy production: đổi thành http://<server-ip>:8080 hoặc https://api.yourdomain.com
-      - BACKEND_URL=${BACKEND_URL:-http://host.docker.internal:8080}
+      # Deploy production: trỏ về domain backend đã có HTTPS
+      - BACKEND_URL=${BACKEND_URL:-https://aura-chat.io.vn}
