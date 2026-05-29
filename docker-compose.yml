@@ -13,10 +13,4 @@ services:
       - VITE_API_URL=https://aura-chat.io.vn
       - VITE_WS_URL=wss://aura-chat.io.vn
       - BACKEND_URL=http://aurachat-backend:8080
-    networks:
-      - aurachat-net  # <-- Thay đổi tên key nội bộ ở đây
-
-networks:
-  aurachat-net:       # <-- Thay đổi tên key nội bộ ở đây
-    external: true
-    name: aurachat-network  # <-- ĐÂY MỚI LÀ CÁI TÊN THỰC TẾ TRÊN EC2 (Giữ nguyên)
+    
