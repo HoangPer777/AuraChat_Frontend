@@ -7,7 +7,9 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"   # <--- Đổi số 3000 thành số 80 ở đây
+    env_file:
+      - .env
     environment:
-      - VITE_API_URL=http://aura-chat.io.vn:8080
-      - VITE_WS_URL=ws://aura-chat.io.vn:8080
-      - BACKEND_URL=http://aura-chat.io.vn:8080
+    - VITE_API_URL=https://aura-chat.io.vn
+    - VITE_WS_URL=wss://aura-chat.io.vn
+    - BACKEND_URL=http://aurachat-backend:8080  # Nếu dùng chung mạng docker network với backend
