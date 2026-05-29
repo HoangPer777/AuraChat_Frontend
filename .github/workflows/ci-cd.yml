@@ -105,13 +105,18 @@ jobs:
             export DOCKER_BUILDKIT=0
             export COMPOSE_DOCKER_CLI_BUILD=0
 
+            echo "Cưỡng ép dọn dẹp container cũ để xóa bỏ hoàn toàn xung đột mạng..."
+            # Lệnh này xóa sạch container đang chạy lỗi để giải phóng liên kết mạng cũ
+            docker rm -f aurachat-frontend 2>/dev/null || true
+
             # Kiểm tra xem server dùng lệnh docker-compose (V1) hay docker compose (V2)
             if command -v docker-compose >/dev/null 2>&1; then
               echo "Using docker-compose (V1)..."
-              docker-compose up -d --build
+              # Thêm --force-recreate để đập đi xây lại container Frontend theo mạng mới
+              docker-compose up -d --build --force-recreate
             else
               echo "Using docker compose (V2)..."
-              docker compose up -d --build
+              docker compose up -d --build --force-recreate
             fi
 
             # Dọn dẹp các ảnh thừa sau khi build để tránh đầy ổ cứng server
