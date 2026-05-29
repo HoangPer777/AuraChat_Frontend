@@ -14,7 +14,13 @@ import useAuthStore from '../store/authStore'
  * Requirements: 11 (Access Token Refresh), 24 (API Integration and Error Handling)
  */
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://32.193.155.80:8080/api'
+const rawApiUrl = import.meta.env.VITE_API_BASE_URL || 'http://32.193.155.80:8080/api'
+const sanitizedApiUrl = rawApiUrl.includes('aura-chat.io.vn')
+  ? 'http://32.193.155.80:8080/api'
+  : rawApiUrl
+const API_URL = sanitizedApiUrl.endsWith('/api')
+  ? sanitizedApiUrl
+  : `${sanitizedApiUrl.replace(/\/$/, '')}/api`
 
 const api = axios.create({
   baseURL: API_URL,
