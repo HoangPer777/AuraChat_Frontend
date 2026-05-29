@@ -17,5 +17,4 @@ services:
 
 networks:
   aurachat-net:
-    external: true
     name: aurachat-network
