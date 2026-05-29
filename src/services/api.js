@@ -14,7 +14,7 @@ import useAuthStore from '../store/authStore'
  * Requirements: 11 (Access Token Refresh), 24 (API Integration and Error Handling)
  */
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://32.193.155.80:8080/api'
 
 const api = axios.create({
   baseURL: API_URL,
