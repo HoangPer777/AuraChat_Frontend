@@ -12,5 +12,5 @@ services:
     environment:
       - VITE_API_URL=${VITE_API_URL:-https://aura-chat.io.vn}
       - VITE_WS_URL=${VITE_WS_URL:-wss://aura-chat.io.vn}
-      - BACKEND_URL=${BACKEND_URL:-https://aura-chat.io.vn}
+      - BACKEND_URL=${BACKEND_URL:-http://aura-chat.io.vn:8080}
     
