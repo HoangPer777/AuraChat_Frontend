@@ -7,8 +7,6 @@ services:
     restart: unless-stopped
     ports:
       - "3000:80"
-    env_file:
-      - .env
     environment:
       - VITE_API_URL=http://aura-chat.io.vn:8080
       - VITE_WS_URL=ws://aura-chat.io.vn:8080
