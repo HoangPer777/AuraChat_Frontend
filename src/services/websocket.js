@@ -1,10 +1,12 @@
 import { Client } from '@stomp/stompjs'
-import SockJS from 'sockjs-client'
 
 /**
  * WebSocket Service with STOMP client
  * Manages WebSocket connection lifecycle, reconnection with exponential backoff,
  * and event subscription mechanism
+ *
+ * Dùng native WebSocket thay SockJS để tương thích với wss:// khi deploy HTTPS.
+ * BE phải có native endpoint (không withSockJS()) để accept kết nối này.
  */
 
 let stompClient = null
@@ -40,10 +42,8 @@ export async function connect(onConnected, onDisconnected, onError) {
     setConnectionState('connecting')
 
     stompClient = new Client({
-      brokerURL: undefined, // Use webSocketFactory instead
-      webSocketFactory: () => {
-        return new SockJS('/ws')
-      },
+      // Tự động dùng wss:// khi trang chạy HTTPS, ws:// khi HTTP
+      brokerURL: `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`,
       connectHeaders: {
         Authorization: `Bearer ${accessToken}`,
       },
