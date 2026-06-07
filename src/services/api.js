@@ -14,16 +14,8 @@ import useAuthStore from '../store/authStore'
  * Requirements: 11 (Access Token Refresh), 24 (API Integration and Error Handling)
  */
 
-// Lấy URL gốc từ biến môi trường, mặc định fallback về domain production mới nếu thiếu
-const rawApiUrl = import.meta.env.VITE_API_BASE_URL || 'https://aura-chat.io.vn/api'
-
-// Chuẩn hóa URL: Đảm bảo luôn kết thúc bằng '/api' và không bị thừa dấu gạch chéo (/)
-const API_URL = rawApiUrl.replace(/\/$/, '').endsWith('/api')
-  ? rawApiUrl.replace(/\/$/, '')
-  : `${rawApiUrl.replace(/\/$/, '')}/api`
-
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 30000,
 })
 
