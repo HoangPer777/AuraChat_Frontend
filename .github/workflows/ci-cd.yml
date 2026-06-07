@@ -112,14 +112,16 @@ jobs:
             echo "Cưỡng ép dọn dẹp container cũ để xóa bỏ hoàn toàn xung đột mạng..."
             docker rm -f aurachat-frontend 2>/dev/null || true
 
-            # Kiểm tra xem server dùng lệnh docker-compose (V1) hay docker compose (V2)
-            if command -v docker-compose >/dev/null 2>&1; then
-              echo "Using docker-compose (V1)..."
-              docker-compose up -d --build --force-recreate
-            else
-              echo "Using docker compose (V2)..."
-              docker compose up -d --build --force-recreate
-            fi
+            # Build image thủ công (tránh lỗi buildx version cũ)
+            DOCKER_BUILDKIT=0 docker build -t project-fe-frontend .
+
+            # Chạy container mới
+            docker run -d \
+              --name aurachat-frontend \
+              --restart unless-stopped \
+              -p 80:80 \
+              -e BACKEND_URL=http://172.17.0.1:8080/ \
+              project-fe-frontend
 
             # Dọn dẹp các ảnh thừa sau khi build để tránh đầy ổ cứng server
             docker image prune -f
