@@ -4,6 +4,9 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install
 COPY . .
+# VITE_API_BASE_URL phải là /api (relative) để không bị Mixed Content khi deploy HTTPS
+ARG VITE_API_BASE_URL=/api
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run build
 
 # Stage 2: Serve with nginx

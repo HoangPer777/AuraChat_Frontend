@@ -102,6 +102,8 @@ jobs:
             # Khai báo biến môi trường chỉ định IP Gateway nội bộ cho Nginx xử lý
             echo "" >> .env
             echo "BACKEND_URL=http://172.17.0.1:8080/" >> .env
+            # Dùng relative path để tránh Mixed Content khi deploy HTTPS
+            echo "VITE_API_BASE_URL=/api" >> .env
 
             # TẮT BUILDKIT: Ép Docker dùng bộ build truyền thống
             export DOCKER_BUILDKIT=0
