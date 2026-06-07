@@ -28,7 +28,6 @@ jobs:
         run: npm ci
 
       - name: Run unit tests
-        # Keep the default Vitest CLI args from package.json.
         run: npm test
 
   docker-build:
@@ -81,7 +80,6 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          # Dùng "." để lấy toàn bộ thư mục gốc mà không bị lỗi tar
           source: "."
           target: /home/${{ secrets.USERNAME }}/project-fe
           rm: true
@@ -96,23 +94,25 @@ jobs:
             set -e
             cd /home/${{ secrets.USERNAME }}/project-fe
             
-            # Ghi file môi trường
+            # Ghi file môi trường và ÉP THÊM BIẾN BACKEND_URL cho Nginx
             cat > .env <<'EOF'
             ${{ secrets.ENV_FILE_CONTENT }}
             EOF
+            
+            # Khai báo biến môi trường chỉ định IP Gateway nội bộ cho Nginx xử lý
+            echo "" >> .env
+            echo "BACKEND_URL=http://172.17.0.1:8080/" >> .env
 
-            # TẮT BUILDKIT: Ép Docker dùng bộ build truyền thống không cần Buildx 0.17
+            # TẮT BUILDKIT: Ép Docker dùng bộ build truyền thống
             export DOCKER_BUILDKIT=0
             export COMPOSE_DOCKER_CLI_BUILD=0
 
             echo "Cưỡng ép dọn dẹp container cũ để xóa bỏ hoàn toàn xung đột mạng..."
-            # Lệnh này xóa sạch container đang chạy lỗi để giải phóng liên kết mạng cũ
             docker rm -f aurachat-frontend 2>/dev/null || true
 
             # Kiểm tra xem server dùng lệnh docker-compose (V1) hay docker compose (V2)
             if command -v docker-compose >/dev/null 2>&1; then
               echo "Using docker-compose (V1)..."
-              # Thêm --force-recreate để đập đi xây lại container Frontend theo mạng mới
               docker-compose up -d --build --force-recreate
             else
               echo "Using docker compose (V2)..."
