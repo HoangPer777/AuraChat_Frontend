@@ -82,6 +82,14 @@ function MainLayout({ children }) {
               >
                 Media
               </Link>
+              {user?.role === 'ADMIN' && (
+                <Link
+                  to="/admin/dashboard"
+                  className="px-3 py-2 rounded-md text-sm font-medium text-purple-700 hover:bg-purple-50"
+                >
+                  Quản trị
+                </Link>
+              )}
             </div>
 
             {/* User Menu */}
@@ -143,6 +151,15 @@ function MainLayout({ children }) {
                       >
                         Media
                       </Link>
+                      {user?.role === 'ADMIN' && (
+                        <Link
+                          to="/admin/dashboard"
+                          className="block px-3 py-2 rounded-md text-sm font-medium text-purple-700 hover:bg-purple-50"
+                          onClick={() => setIsUserMenuOpen(false)}
+                        >
+                          Quản trị
+                        </Link>
+                      )}
                     </div>
 
                     {/* User Info */}
