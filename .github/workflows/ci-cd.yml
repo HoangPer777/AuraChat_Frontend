@@ -98,6 +98,9 @@ jobs:
           script: |
             set -e
             cd /home/${{ secrets.USERNAME }}/project-fe
+            RAW_BACKEND_URL="${{ secrets.BACKEND_URL }}"
+            BACKEND_URL_CLEAN="${RAW_BACKEND_URL%/}"
+            BACKEND_URL_CLEAN="${BACKEND_URL_CLEAN%/api}"
             
             # Ghi file môi trường và ÉP THÊM BIẾN BACKEND_URL cho Nginx
             cat > .env <<'EOF'
@@ -106,7 +109,7 @@ jobs:
             
             # URL của EC2 backend (riêng biệt)
             echo "" >> .env
-            echo "BACKEND_URL=${{ secrets.BACKEND_URL }}" >> .env
+            echo "BACKEND_URL=${BACKEND_URL_CLEAN}" >> .env
             # Dùng relative path để tránh Mixed Content khi deploy HTTPS
             echo "VITE_API_BASE_URL=/api" >> .env
 
@@ -125,7 +128,7 @@ jobs:
               --name aurachat-frontend \
               --restart unless-stopped \
               -p 80:80 \
-              -e BACKEND_URL=${{ secrets.BACKEND_URL }} \
+              -e BACKEND_URL=${BACKEND_URL_CLEAN} \
               project-fe-frontend
 
             # Dọn dẹp các ảnh thừa sau khi build để tránh đầy ổ cứng server
