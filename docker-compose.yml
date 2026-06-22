@@ -13,4 +13,3 @@ services:
       - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
       - VITE_WS_URL=${VITE_WS_URL:-ws://32.195.171.12}
       - BACKEND_URL=${BACKEND_URL:-http://32.195.171.12:8080}
-    
