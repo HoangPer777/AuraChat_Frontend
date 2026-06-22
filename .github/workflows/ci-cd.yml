@@ -104,9 +104,9 @@ jobs:
             ${{ secrets.ENV_FILE_CONTENT }}
             EOF
             
-            # Khai báo biến môi trường chỉ định IP Gateway nội bộ cho Nginx xử lý
+            # URL của EC2 backend (riêng biệt)
             echo "" >> .env
-            echo "BACKEND_URL=http://172.17.0.1:8080" >> .env
+            echo "BACKEND_URL=${{ secrets.BACKEND_URL }}" >> .env
             # Dùng relative path để tránh Mixed Content khi deploy HTTPS
             echo "VITE_API_BASE_URL=/api" >> .env
 
@@ -125,7 +125,7 @@ jobs:
               --name aurachat-frontend \
               --restart unless-stopped \
               -p 80:80 \
-              -e BACKEND_URL=http://172.17.0.1:8080/ \
+              -e BACKEND_URL=${{ secrets.BACKEND_URL }} \
               project-fe-frontend
 
             # Dọn dẹp các ảnh thừa sau khi build để tránh đầy ổ cứng server
