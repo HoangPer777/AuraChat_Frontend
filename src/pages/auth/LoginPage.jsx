@@ -9,24 +9,29 @@ import { auth, googleProvider, facebookProvider } from '../../config/firebase';
 /**
  * LoginPage
  *
- * Navigation strategy: use window.location.replace('/chat') instead of
+ * Navigation strategy: use window.location.replace(...) instead of
  * React Router navigate() to avoid the race condition where ProtectedRoute
  * renders before Zustand state propagates after setAuth().
  */
 export default function LoginPage() {
-  const { setAuth, accessToken } = useAuthStore();
+  const { setAuth, accessToken, user } = useAuthStore();
   const [apiError, setApiError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm();
 
-  // If already authenticated, go straight to chat
+  const redirectAfterLogin = (authenticatedUser) => {
+    window.location.replace(authenticatedUser?.role === 'ADMIN' ? '/admin/dashboard' : '/chat');
+  };
+
+  // If already authenticated, go to the appropriate landing page
   useEffect(() => {
     const token = accessToken || localStorage.getItem('accessToken');
     if (token) {
-      window.location.replace('/chat');
+      const storedUser = user || JSON.parse(localStorage.getItem('user') || 'null');
+      redirectAfterLogin(storedUser);
     }
-  }, [accessToken]);
+  }, [accessToken, user]);
 
   // Handle Firebase redirect result (Google/Facebook redirect flow)
   useEffect(() => {
@@ -45,7 +50,7 @@ export default function LoginPage() {
         if (response.data?.success) {
           const { accessToken, refreshToken, user } = response.data.data;
           setAuth(user, accessToken, refreshToken);
-          window.location.replace('/chat');
+          redirectAfterLogin(user);
         } else {
           setApiError(response.data?.message || 'Đăng nhập bằng chuyển hướng thất bại.');
         }
@@ -76,7 +81,7 @@ export default function LoginPage() {
       if (response.data?.success) {
         const { accessToken, refreshToken, user } = response.data.data;
         setAuth(user, accessToken, refreshToken);
-        window.location.replace('/chat');
+        redirectAfterLogin(user);
       } else {
         setApiError(response.data?.message || 'Đăng nhập thất bại.');
       }
@@ -107,7 +112,7 @@ export default function LoginPage() {
       if (response.data?.success) {
         const { accessToken, refreshToken, user } = response.data.data;
         setAuth(user, accessToken, refreshToken);
-        window.location.replace('/chat');
+        redirectAfterLogin(user);
       } else {
         setApiError(response.data?.message || `Đăng nhập bằng ${providerName} thất bại.`);
       }

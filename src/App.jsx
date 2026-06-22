@@ -20,6 +20,8 @@ import AudioCallPage from './pages/call/AudioCallPage'
 import VideoCallPage from './pages/call/VideoCallPage'
 import DashboardPage from './pages/admin/DashboardPage'
 import UsersPage from './pages/admin/UsersPage'
+import BannedIpsPage from './pages/admin/BannedIpsPage'
+import AdminLayout from './components/admin/AdminLayout'
 import ProfilePageNew from './pages/chat/ProfilePage'
 import MediaLibraryPage from './pages/media/MediaLibraryPage'
 
@@ -98,6 +100,14 @@ function App() {
             />
           </Route>
 
+          <Route element={<ProtectedRoute requiredRole="ADMIN" />}>
+            <Route element={<AdminLayout />}>
+              <Route path="/admin/dashboard" element={<DashboardPage />} />
+              <Route path="/admin/users" element={<UsersPage />} />
+              <Route path="/admin/banned-ips" element={<BannedIpsPage />} />
+            </Route>
+          </Route>
+
           {/* Test UI Routes */}
           <Route path="/test-ui/home" element={<HomePage />} />
           <Route path="/test-ui/chat" element={<ChatWindowPage />} />
@@ -109,8 +119,8 @@ function App() {
           <Route path="/test-ui/calling" element={<CallingPage />} />
           <Route path="/test-ui/audio-call" element={<AudioCallPage />} />
           <Route path="/test-ui/video-call" element={<VideoCallPage />} />
-          <Route path="/test-ui/admin-dashboard" element={<DashboardPage />} />
-          <Route path="/test-ui/admin-users" element={<UsersPage />} />
+          <Route path="/test-ui/admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="/test-ui/admin-users" element={<Navigate to="/admin/users" replace />} />
 
           {/* 404 Fallback */}
           <Route path="/404" element={<div className="flex items-center justify-center min-h-screen text-2xl">Page Not Found</div>} />
