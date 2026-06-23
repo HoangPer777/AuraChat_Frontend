@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import useIncomingCallNotifications from '../../hooks/useIncomingCallNotifications'
 import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications'
+import useNotificationHub from '../../hooks/useNotificationHub'
+import usePushNotification from '../../hooks/usePushNotification'
 import useChatWebSocket from '../../hooks/useChatWebSocket'
 import usePresenceSync from '../../hooks/usePresenceSync'
 import useFriendStore from '../../store/friendStore'
@@ -15,6 +17,8 @@ export default function UserRealtimeSync() {
 
   useIncomingCallNotifications()
   useFriendRequestNotifications()
+  useNotificationHub()
+  usePushNotification()
   useChatWebSocket()
   usePresenceSync()
 

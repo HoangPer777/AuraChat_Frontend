@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
 import useFriendStore from '../../store/friendStore'
+import useNotificationStore from '../../store/notificationStore'
 
 export const USER_SIDE_RAIL_WIDTH = 80
 
@@ -27,7 +28,15 @@ export default function UserSideRail() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const pendingRequests = useFriendStore((s) => s.pendingRequests)
-  const notificationCount = pendingRequests?.length || 0
+  const notificationItems = useNotificationStore((s) => s.items)
+
+  const notificationCount = (() => {
+    const unreadStore = notificationItems.filter((item) => !item.read).length
+    const pendingNotInStore = (pendingRequests || []).filter(
+      (request) => !notificationItems.some((item) => item.id === `friend-${request.id}`),
+    ).length
+    return unreadStore + pendingNotInStore
+  })()
 
   const avatarSrc =
     user?.avatarUrl ||
