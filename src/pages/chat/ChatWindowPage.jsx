@@ -5,6 +5,7 @@ import useChatStore from '../../store/chatStore';
 import useFriendStore from '../../store/friendStore';
 import api from '../../services/api';
 import { createPrivateConversation } from '../../services/friendService';
+import { getConversation } from '../../services/conversationService';
 import { uploadFile, uploadImage, uploadAudio } from '../../services/mediaService';
 import { startOutgoingVideoCall, startOutgoingAudioCall } from '../../utils/callHelpers';
 import OnlineIndicator from '../../components/user/OnlineIndicator';
@@ -13,17 +14,24 @@ import useVoiceRecorder from '../../hooks/useVoiceRecorder';
 import { buildVoiceFile } from '../../utils/voiceMessage';
 import StickerPicker from '../../components/chat/StickerPicker';
 import { findStickerById } from '../../utils/stickers';
+import GroupInfoModal from '../../components/chat/GroupInfoModal';
+import {
+  getConversationAvatar,
+  getConversationDisplayName,
+  resolveSenderInfo,
+} from '../../utils/conversationHelpers';
 
 export default function ChatWindowPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
-  const { conversations, setConversations, activeConversation, setActiveConversation, messages, setMessages, addMessage } = useChatStore();
+  const { conversations, setConversations, activeConversation, setActiveConversation, messages, setMessages, addMessage, upsertConversation, removeConversation } = useChatStore();
   const { friends, loadFriends, isFriend } = useFriendStore();
   const [newMessage, setNewMessage] = useState('');
   const [uploadingType, setUploadingType] = useState(null);
   const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [isResolvingConversation, setIsResolvingConversation] = useState(true);
   const messagesEndRef = useRef(null);
   const imageInputRef = useRef(null);
@@ -40,10 +48,16 @@ export default function ChatWindowPage() {
   } = useVoiceRecorder();
 
   const friendId = searchParams.get('friendId') || location.state?.friendId || null;
+  const conversationIdParam = searchParams.get('conversationId') || location.state?.conversationId || null;
   const callNotice = location.state?.callNotice || null;
 
+  const isGroupChat = activeConversation?.type === 'GROUP';
+  const conversationTitle = getConversationDisplayName(activeConversation, user?.id);
+  const conversationAvatar = getConversationAvatar(activeConversation, user?.id);
+  const memberCount = activeConversation?.members?.length || 0;
+
   const getConversationPeerId = (conversation) => {
-    if (!conversation) return null;
+    if (!conversation || conversation.type === 'GROUP') return null;
 
     if (conversation.receiverId && conversation.receiverId !== user?.id) {
       return conversation.receiverId;
@@ -113,7 +127,33 @@ export default function ChatWindowPage() {
   }, [setConversations]);
 
   useEffect(() => {
-    if (!friendId) {
+    if (!conversationIdParam) return;
+
+    if (activeConversation?.id === conversationIdParam) return;
+
+    const matchedConversation = conversations.find((conversation) => conversation.id === conversationIdParam);
+    if (matchedConversation) {
+      setActiveConversation(matchedConversation);
+      return;
+    }
+
+    const loadConversation = async () => {
+      try {
+        const response = await getConversation(conversationIdParam);
+        if (response?.success && response?.data) {
+          upsertConversation(response.data);
+          setActiveConversation(response.data);
+        }
+      } catch (err) {
+        console.error('Error loading conversation:', err);
+      }
+    };
+
+    loadConversation();
+  }, [activeConversation?.id, conversationIdParam, conversations, setActiveConversation, upsertConversation]);
+
+  useEffect(() => {
+    if (!friendId || isGroupChat) {
       return;
     }
 
@@ -159,7 +199,7 @@ export default function ChatWindowPage() {
       
       createConversation();
     }
-  }, [activeConversation, conversations, friendId, setActiveConversation, friends]);
+  }, [activeConversation, conversations, friendId, isGroupChat, setActiveConversation, friends]);
 
   useEffect(() => {
     if (!isResolvingConversation && !activeConversation) {
@@ -366,7 +406,7 @@ export default function ChatWindowPage() {
   }
 
   const getConversationPeer = (conversation) => {
-    if (!conversation) return null;
+    if (!conversation || conversation.type === 'GROUP') return null;
 
     const peerId = getConversationPeerId(conversation)
     if (!peerId) return null
@@ -396,7 +436,10 @@ export default function ChatWindowPage() {
   };
 
   const conversationPeer = getConversationPeer(activeConversation);
-  const canCallPeer = Boolean(conversationPeer?.id && isFriend(conversationPeer.id));
+  const canCallPeer = !isGroupChat && Boolean(conversationPeer?.id && isFriend(conversationPeer.id));
+
+  const getMessageSenderInfo = (senderId) =>
+    resolveSenderInfo(activeConversation, senderId, user, user?.id);
 
   const startPeerCall = (callType) => {
     if (!activeConversation) return;
@@ -432,51 +475,94 @@ export default function ChatWindowPage() {
     return new Date(isoString).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const handleGroupConversationUpdate = (updatedConversation) => {
+    upsertConversation(updatedConversation);
+    setActiveConversation(updatedConversation, true);
+  };
+
+  const handleGroupLeave = () => {
+    if (!activeConversation?.id) return;
+    removeConversation(activeConversation.id);
+    setShowGroupInfo(false);
+    navigate('/chat');
+  };
+
   if (!activeConversation) return null;
 
   return (
     <div className="bg-surface font-sans text-on-surface overflow-hidden h-screen flex flex-1">
+      {isGroupChat && (
+        <GroupInfoModal
+          open={showGroupInfo}
+          conversation={activeConversation}
+          currentUserId={user?.id}
+          friends={friends}
+          onClose={() => setShowGroupInfo(false)}
+          onConversationUpdate={handleGroupConversationUpdate}
+          onLeave={handleGroupLeave}
+        />
+      )}
       <section className="flex-1 flex flex-col bg-surface overflow-hidden">
           {/* HEADER */}
           <header className="h-16 flex justify-between items-center px-4 border-b border-outline-variant bg-surface/80 backdrop-blur-md z-10">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <img alt={activeConversation.name} className="w-10 h-10 rounded-full object-cover" src={activeConversation.avatar || "https://ui-avatars.com/api/?name=" + activeConversation.name} />
-                <OnlineIndicator
-                  userId={activePeerId}
-                  className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"
-                />
+                <img alt={conversationTitle} className="w-10 h-10 rounded-full object-cover" src={conversationAvatar} />
+                {!isGroupChat && (
+                  <OnlineIndicator
+                    userId={activePeerId}
+                    className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"
+                  />
+                )}
               </div>
               <div>
-                <h2 className="font-bold text-on-surface">{activeConversation.name}</h2>
-                <p className={`text-[10px] ${peerOnline ? 'text-green-600' : 'text-outline'} flex items-center gap-1`}>
-                  <span className={`w-1.5 h-1.5 ${peerOnline ? 'bg-green-500' : 'bg-outline'} rounded-full`}></span>
-                  {peerOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
-                </p>
+                <h2 className="font-bold text-on-surface">{conversationTitle}</h2>
+                {isGroupChat ? (
+                  <p className="text-[10px] text-outline flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[12px]">groups</span>
+                    {memberCount} thành viên
+                  </p>
+                ) : (
+                  <p className={`text-[10px] ${peerOnline ? 'text-green-600' : 'text-outline'} flex items-center gap-1`}>
+                    <span className={`w-1.5 h-1.5 ${peerOnline ? 'bg-green-500' : 'bg-outline'} rounded-full`}></span>
+                    {peerOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2 text-on-surface-variant">
-                <button
-                  type="button"
-                  onClick={startAudioCall}
-                  disabled={!canCallPeer}
-                  title="Gọi thoại"
-                  className="p-2 hover:bg-surface-container-high rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  aria-label="Gọi thoại"
-                >
-                  <span className="material-symbols-outlined">call</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={startVideoCall}
-                  disabled={!canCallPeer}
-                  title="Gọi video"
-                  className="p-2 hover:bg-surface-container-high rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  aria-label="Gọi video"
-                >
-                  <span className="material-symbols-outlined">videocam</span>
-                </button>
-              <button className="p-2 hover:bg-surface-container-high rounded-full transition-colors">
+                {!isGroupChat && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={startAudioCall}
+                      disabled={!canCallPeer}
+                      title="Gọi thoại"
+                      className="p-2 hover:bg-surface-container-high rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      aria-label="Gọi thoại"
+                    >
+                      <span className="material-symbols-outlined">call</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={startVideoCall}
+                      disabled={!canCallPeer}
+                      title="Gọi video"
+                      className="p-2 hover:bg-surface-container-high rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      aria-label="Gọi video"
+                    >
+                      <span className="material-symbols-outlined">videocam</span>
+                    </button>
+                  </>
+                )}
+              <button
+                type="button"
+                onClick={() => isGroupChat && setShowGroupInfo(true)}
+                disabled={!isGroupChat}
+                className="p-2 hover:bg-surface-container-high rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label="Thông tin nhóm"
+                title={isGroupChat ? 'Thông tin nhóm' : undefined}
+              >
                 <span className="material-symbols-outlined">info</span>
               </button>
             </div>
@@ -488,12 +574,14 @@ export default function ChatWindowPage() {
               const isMe = msg.senderId === user?.id;
               const isCallLog = msg.type === 'CALL_LOG';
               const isSticker = msg.type === 'STICKER';
+              const senderInfo = getMessageSenderInfo(msg.senderId);
+              const showSenderName = isGroupChat && !isMe && !isCallLog;
 
               if (isCallLog) {
                 return (
                   <div key={msg.id || index} className={`flex ${isMe ? 'justify-end' : 'items-end gap-2'} max-w-[85%] ${isMe ? 'ml-auto' : ''}`}>
                     {!isMe && (
-                      <img alt="Avatar" className="w-8 h-8 rounded-full object-cover flex-shrink-0" src={activeConversation.avatar || "https://ui-avatars.com/api/?name=" + activeConversation.name} />
+                      <img alt="Avatar" className="w-8 h-8 rounded-full object-cover flex-shrink-0" src={senderInfo.avatar} />
                     )}
                     <div className="bg-surface-container-high text-on-surface-variant px-4 py-2.5 rounded-2xl shadow-sm border border-outline-variant/40">
                       <div className="flex items-center gap-2 text-sm">
@@ -509,8 +597,12 @@ export default function ChatWindowPage() {
               return (
                 <div key={msg.id || index} className={`flex ${isMe ? 'flex-col items-end' : 'items-end gap-2'} max-w-[70%] ${isMe ? 'ml-auto' : ''}`}>
                   {!isMe && (
-                    <img alt="Avatar" className="w-8 h-8 rounded-full object-cover flex-shrink-0" src={activeConversation.avatar || "https://ui-avatars.com/api/?name=" + activeConversation.name} />
+                    <img alt={senderInfo.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" src={senderInfo.avatar} />
                   )}
+                  <div className={`${isMe ? 'items-end' : 'items-start'} flex flex-col max-w-full`}>
+                    {showSenderName && (
+                      <span className="text-[11px] font-semibold text-outline mb-1 ml-1">{senderInfo.name}</span>
+                    )}
                   <div className={`${isSticker ? 'p-1 bg-transparent shadow-none' : `${isMe ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface'} p-3 shadow-sm`} rounded-2xl ${isSticker ? '' : isMe ? 'rounded-br-none' : 'rounded-bl-none'} max-w-full`}>
                     {isSticker && msg.fileUrl ? (
                       <img
@@ -548,6 +640,7 @@ export default function ChatWindowPage() {
                       msg.content
                     )}
                     <span className={`block text-[10px] ${isSticker ? 'text-outline' : isMe ? 'text-white/70' : 'text-outline'} mt-1 text-right`}>{formatTime(msg.createdAt || msg.sentAt)}</span>
+                  </div>
                   </div>
                 </div>
               );

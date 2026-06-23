@@ -33,6 +33,34 @@ const useChatStore = create((set, get) => ({
   setConversations: (conversations) => set({ conversations, error: null }),
 
   /**
+   * Insert or update a conversation in the list (e.g. after creating a group).
+   */
+  upsertConversation: (conversation) =>
+    set((state) => {
+      if (!conversation?.id) return state
+
+      const existingIndex = state.conversations.findIndex((conv) => conv.id === conversation.id)
+      if (existingIndex >= 0) {
+        const conversations = [...state.conversations]
+        conversations[existingIndex] = { ...conversations[existingIndex], ...conversation }
+        return { conversations }
+      }
+
+      return { conversations: [conversation, ...state.conversations] }
+    }),
+
+  /**
+   * Remove a conversation from the list (e.g. after leaving a group).
+   */
+  removeConversation: (conversationId) =>
+    set((state) => ({
+      conversations: state.conversations.filter((conv) => conv.id !== conversationId),
+      activeConversation:
+        state.activeConversation?.id === conversationId ? null : state.activeConversation,
+      messages: state.activeConversation?.id === conversationId ? [] : state.messages,
+    })),
+
+  /**
    * Set active conversation. Clears messages unless keepMessages is true.
    */
   setActiveConversation: (conversation, keepMessages = false) =>

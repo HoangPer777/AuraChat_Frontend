@@ -7,6 +7,11 @@ import api from '../../services/api';
 import { startOutgoingVideoCall, startOutgoingAudioCall } from '../../utils/callHelpers';
 import OnlineIndicator from '../../components/user/OnlineIndicator';
 import { formatCallLogText } from '../../utils/callLogMessage';
+import {
+  getConversationAvatar,
+  getConversationDisplayName,
+  resolveSenderInfo,
+} from '../../utils/conversationHelpers';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -36,24 +41,10 @@ export default function HomePage() {
   };
 
   // Lấy tên hiển thị của conversation
-  const getConvName = (conv) => {
-    if (conv.name) return conv.name;
-    if (conv.type === 'PRIVATE' && conv.members) {
-      const other = conv.members.find(m => m.userId !== user?.id);
-      return other?.displayName || (other ? `User ${other.userId.slice(-6)}` : 'Chat');
-    }
-    return 'Conversation';
-  };
+  const getConvName = (conv) => getConversationDisplayName(conv, user?.id);
 
   // Lấy avatar của conversation
-  const getConvAvatar = (conv) => {
-    if (conv.avatarUrl) return conv.avatarUrl;
-    if (conv.type === 'PRIVATE' && conv.members) {
-      const other = conv.members.find(m => m.userId !== user?.id);
-      if (other?.avatarUrl) return other.avatarUrl;
-    }
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(getConvName(conv))}`;
-  };
+  const getConvAvatar = (conv) => getConversationAvatar(conv, user?.id);
 
   // Lấy preview tin nhắn cuối
   const getLastMessagePreview = (conv) => {
@@ -73,6 +64,16 @@ export default function HomePage() {
     if (conv.lastMessage.type === 'FILE') {
       return 'Đã gửi một tệp';
     }
+
+    if (conv.type === 'GROUP' && conv.lastMessage.senderId && conv.lastMessage.senderId !== user?.id) {
+      const sender = conv.members?.find((member) => member.userId === conv.lastMessage.senderId);
+      const senderName = sender?.displayName;
+      const content = conv.lastMessage.content || 'Đã gửi một tin nhắn';
+      if (senderName) {
+        return `${senderName}: ${content}`;
+      }
+    }
+
     return conv.lastMessage.content || 'Đã gửi một tin nhắn';
   };
 
@@ -150,22 +151,33 @@ export default function HomePage() {
               const lastTime = formatTime(conv.lastMessage?.sentAt || conv.updatedAt);
               const peerId = getConvPeerId(conv);
               const canCall = conv.type === 'PRIVATE' && peerId && isFriend(peerId);
+              const isGroup = conv.type === 'GROUP';
+              const memberCount = conv.members?.length || 0;
               return (
                 <div key={conv.id} onClick={() => handleConversationClick(conv)} className="p-3 flex items-center gap-3 hover:bg-surface-container-low cursor-pointer rounded-xl transition-all group">
                   <div className="relative shrink-0">
                     <img alt={convName} className="w-12 h-12 rounded-full object-cover" src={convAvatar} />
-                    <OnlineIndicator
-                      userId={peerId}
-                      className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-surface-container rounded-full"
-                    />
+                    {isGroup ? (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center border-2 border-surface-container">
+                        <span className="material-symbols-outlined text-[12px]">groups</span>
+                      </span>
+                    ) : (
+                      <OnlineIndicator
+                        userId={peerId}
+                        className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-surface-container rounded-full"
+                      />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-baseline">
                       <h3 className="font-semibold text-on-surface truncate">{convName}</h3>
                       <span className="text-[11px] text-outline">{lastTime}</span>
                     </div>
-                    <div className="flex justify-between items-center mt-0.5">
+                    <div className="flex justify-between items-center mt-0.5 gap-2">
                       <p className="text-xs text-on-surface-variant truncate">{lastMsg}</p>
+                      {isGroup && (
+                        <span className="text-[10px] text-outline shrink-0">{memberCount} TV</span>
+                      )}
                     </div>
                   </div>
                   {canCall && (
