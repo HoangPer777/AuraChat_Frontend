@@ -13,6 +13,7 @@ RUN npm run build
 FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy as template so nginx envsubst can substitute ${BACKEND_URL} at startup
+COPY nginx-websocket-map.conf.template /etc/nginx/templates/websocket-map.conf.template
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 EXPOSE 80

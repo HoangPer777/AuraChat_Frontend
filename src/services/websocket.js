@@ -1,22 +1,31 @@
 import { Client } from '@stomp/stompjs'
-import SockJS from 'sockjs-client'
 
 /**
  * WebSocket Service with STOMP client
  * Manages WebSocket connection lifecycle, reconnection with exponential backoff,
  * and event subscription mechanism
  *
- * Dùng native WebSocket thay SockJS để tương thích với wss:// khi deploy HTTPS.
- * BE phải có native endpoint (không withSockJS()) để accept kết nối này.
+ * Production: native WebSocket qua Nginx proxy (wss://domain/ws).
+ * Dev: Vite proxy /ws -> backend (ws://localhost:3000/ws).
  */
 
 let stompClient = null
 let subscriptions = new Map()
 let reconnectAttempts = 0
 const MAX_RECONNECT_ATTEMPTS = 5
-const BACKOFF_DELAYS = [1000, 2000, 4000, 8000, 16000, 32000] // 1s, 2s, 4s, 8s, 16s, 32s
-let connectionState = 'disconnected' // 'disconnected', 'connecting', 'connected'
+const BACKOFF_DELAYS = [1000, 2000, 4000, 8000, 16000, 32000]
+let connectionState = 'disconnected'
 let onConnectionStateChange = null
+
+function resolveBrokerUrl() {
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL
+  }
+
+  const isSecure = window.location.protocol === 'https:'
+  const wsProtocol = isSecure ? 'wss' : 'ws'
+  return `${wsProtocol}://${window.location.host}/ws`
+}
 
 /**
  * Initialize and connect to WebSocket server
@@ -42,18 +51,8 @@ export async function connect(onConnected, onDisconnected, onError) {
 
     setConnectionState('connecting')
 
-    const isSecure = window.location.protocol === 'https:'
-    const wsProtocol = isSecure ? 'wss' : 'ws'
-    const httpProtocol = isSecure ? 'https' : 'http'
-    const wsBase = `${wsProtocol}://${window.location.host}/ws`
-    const sockJsBase = `${httpProtocol}://${window.location.host}/ws`
-    const configuredWsUrl = import.meta.env.VITE_WS_URL
-
     stompClient = new Client({
-      // Ưu tiên URL cấu hình nếu có; fallback về same-origin
-      brokerURL: configuredWsUrl || wsBase,
-      // SockJS fallback để tăng tương thích production qua reverse proxy/CDN
-      webSocketFactory: () => new SockJS(sockJsBase),
+      brokerURL: resolveBrokerUrl(),
       connectHeaders: {
         Authorization: `Bearer ${accessToken}`,
       },
@@ -78,7 +77,6 @@ export async function connect(onConnected, onDisconnected, onError) {
         onError?.(error)
         reject(error)
       },
-      // Disable automatic reconnection - we'll handle it manually with exponential backoff
       reconnectDelay: 0,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
@@ -159,7 +157,6 @@ export function subscribe(destination, callback) {
     return null
   }
 
-  // Check if already subscribed to this destination
   if (subscriptions.has(destination)) {
     console.warn(`Already subscribed to ${destination}`)
     return subscriptions.get(destination)
@@ -169,8 +166,7 @@ export function subscribe(destination, callback) {
     try {
       const body = JSON.parse(message.body)
       callback(body)
-    } catch (error) {
-      // If body is not JSON, pass raw body
+    } catch {
       callback(message.body)
     }
   })
