@@ -1,12 +1,12 @@
 import { Client } from '@stomp/stompjs'
+import SockJS from 'sockjs-client'
 
 /**
  * WebSocket Service with STOMP client
- * Manages WebSocket connection lifecycle, reconnection with exponential backoff,
- * and event subscription mechanism
  *
- * Production: native WebSocket qua Nginx proxy (wss://domain/ws).
- * Dev: Vite proxy /ws -> backend (ws://localhost:3000/ws).
+ * Dev (http://localhost): native WebSocket qua Vite proxy.
+ * Production HTTPS: SockJS xhr-streaming/polling — tránh Cloudflare chặn WS upgrade (301 -> http).
+ * Override: set VITE_WS_URL=wss://... cho native WS trực tiếp tới backend (DNS-only, SSL Full).
  */
 
 let stompClient = null
@@ -25,6 +25,40 @@ function resolveBrokerUrl() {
   const isSecure = window.location.protocol === 'https:'
   const wsProtocol = isSecure ? 'wss' : 'ws'
   return `${wsProtocol}://${window.location.host}/ws`
+}
+
+function shouldUseSockJsXhr() {
+  if (import.meta.env.VITE_WS_URL) {
+    return false
+  }
+  if (import.meta.env.VITE_WS_FORCE_XHR === 'true') {
+    return true
+  }
+  // Cloudflare Flexible SSL thường trả 301 http:// khi browser gửi Upgrade: websocket
+  return window.location.protocol === 'https:'
+}
+
+function buildClientOptions(accessToken) {
+  const options = {
+    connectHeaders: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    reconnectDelay: 0,
+    heartbeatIncoming: 4000,
+    heartbeatOutgoing: 4000,
+  }
+
+  if (shouldUseSockJsXhr()) {
+    const sockJsUrl = `${window.location.protocol}//${window.location.host}/ws`
+    options.webSocketFactory = () =>
+      new SockJS(sockJsUrl, null, {
+        transports: ['xhr-streaming', 'xhr-polling'],
+      })
+  } else {
+    options.brokerURL = resolveBrokerUrl()
+  }
+
+  return options
 }
 
 /**
@@ -52,10 +86,7 @@ export async function connect(onConnected, onDisconnected, onError) {
     setConnectionState('connecting')
 
     stompClient = new Client({
-      brokerURL: resolveBrokerUrl(),
-      connectHeaders: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      ...buildClientOptions(accessToken),
       onConnect: (frame) => {
         setConnectionState('connected')
         reconnectAttempts = 0
@@ -77,9 +108,6 @@ export async function connect(onConnected, onDisconnected, onError) {
         onError?.(error)
         reject(error)
       },
-      reconnectDelay: 0,
-      heartbeatIncoming: 4000,
-      heartbeatOutgoing: 4000,
     })
 
     stompClient.activate()
