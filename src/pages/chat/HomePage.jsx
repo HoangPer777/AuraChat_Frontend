@@ -67,6 +67,9 @@ export default function HomePage() {
     if (conv.lastMessage.type === 'IMAGE') {
       return 'Đã gửi một hình ảnh';
     }
+    if (conv.lastMessage.type === 'STICKER') {
+      return 'Sticker';
+    }
     if (conv.lastMessage.type === 'FILE') {
       return 'Đã gửi một tệp';
     }

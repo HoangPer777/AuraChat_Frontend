@@ -53,11 +53,20 @@ const useChatStore = create((set, get) => ({
 
   /**
    * Add a new message to the messages array (keeps chronological order).
+   * Idempotent — skips if message id already exists.
    */
   addMessage: (message) =>
-    set((state) => ({
-      messages: sortMessagesAscending([...state.messages, message]),
-    })),
+    set((state) => {
+      if (!message) return state
+
+      if (message.id && state.messages.some((m) => m.id === message.id)) {
+        return state
+      }
+
+      return {
+        messages: sortMessagesAscending([...state.messages, message]),
+      }
+    }),
 
   /**
    * Set complete messages array for active conversation

@@ -10,6 +10,9 @@ import { startOutgoingVideoCall, startOutgoingAudioCall } from '../../utils/call
 import OnlineIndicator from '../../components/user/OnlineIndicator';
 import { formatCallLogText } from '../../utils/callLogMessage';
 import useVoiceRecorder from '../../hooks/useVoiceRecorder';
+import { buildVoiceFile } from '../../utils/voiceMessage';
+import StickerPicker from '../../components/chat/StickerPicker';
+import { findStickerById } from '../../utils/stickers';
 
 export default function ChatWindowPage() {
   const navigate = useNavigate();
@@ -20,6 +23,7 @@ export default function ChatWindowPage() {
   const { friends, loadFriends, isFriend } = useFriendStore();
   const [newMessage, setNewMessage] = useState('');
   const [uploadingType, setUploadingType] = useState(null);
+  const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
   const [isResolvingConversation, setIsResolvingConversation] = useState(true);
   const messagesEndRef = useRef(null);
   const imageInputRef = useRef(null);
@@ -280,10 +284,7 @@ export default function ChatWindowPage() {
     const conversationId = await ensureConversationId()
     if (!conversationId) return
 
-    const extension = recording.mimeType.includes('ogg') ? 'ogg' : 'webm'
-    const voiceFile = new File([recording.blob], `voice-${Date.now()}.${extension}`, {
-      type: recording.mimeType,
-    })
+    const voiceFile = buildVoiceFile(recording)
 
     setUploadingType('VOICE')
     try {
@@ -308,6 +309,32 @@ export default function ChatWindowPage() {
     } catch (err) {
       console.error('Error sending voice message:', err)
       window.alert(err.response?.data?.message || 'Không thể gửi tin nhắn thoại.')
+    } finally {
+      setUploadingType(null)
+    }
+  }
+
+  const handleSendSticker = async (sticker) => {
+    if (!sticker || !activeConversation) return
+
+    const conversationId = await ensureConversationId()
+    if (!conversationId) return
+
+    setStickerPickerOpen(false)
+    setUploadingType('STICKER')
+    try {
+      const messageResponse = await api.post(`/conversations/${conversationId}/messages`, {
+        content: sticker.id,
+        type: 'STICKER',
+        fileUrl: sticker.url,
+      })
+
+      if (messageResponse.data?.success) {
+        addMessage(messageResponse.data.data)
+      }
+    } catch (err) {
+      console.error('Error sending sticker:', err)
+      window.alert(err.response?.data?.message || 'Không thể gửi sticker.')
     } finally {
       setUploadingType(null)
     }
@@ -460,6 +487,7 @@ export default function ChatWindowPage() {
             {messages.map((msg, index) => {
               const isMe = msg.senderId === user?.id;
               const isCallLog = msg.type === 'CALL_LOG';
+              const isSticker = msg.type === 'STICKER';
 
               if (isCallLog) {
                 return (
@@ -483,8 +511,14 @@ export default function ChatWindowPage() {
                   {!isMe && (
                     <img alt="Avatar" className="w-8 h-8 rounded-full object-cover flex-shrink-0" src={activeConversation.avatar || "https://ui-avatars.com/api/?name=" + activeConversation.name} />
                   )}
-                  <div className={`${isMe ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface'} p-3 rounded-2xl ${isMe ? 'rounded-br-none' : 'rounded-bl-none'} shadow-sm max-w-full`}>
-                    {msg.type === 'IMAGE' && msg.fileUrl ? (
+                  <div className={`${isSticker ? 'p-1 bg-transparent shadow-none' : `${isMe ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface'} p-3 shadow-sm`} rounded-2xl ${isSticker ? '' : isMe ? 'rounded-br-none' : 'rounded-bl-none'} max-w-full`}>
+                    {isSticker && msg.fileUrl ? (
+                      <img
+                        src={msg.fileUrl}
+                        alt={findStickerById(msg.content)?.emoji || 'Sticker'}
+                        className="w-28 h-28 object-contain"
+                      />
+                    ) : msg.type === 'IMAGE' && msg.fileUrl ? (
                       <img
                         src={msg.fileUrl}
                         alt="Hình ảnh"
@@ -513,7 +547,7 @@ export default function ChatWindowPage() {
                     ) : (
                       msg.content
                     )}
-                    <span className={`block text-[10px] ${isMe ? 'text-white/70' : 'text-outline'} mt-1 text-right`}>{formatTime(msg.createdAt || msg.sentAt)}</span>
+                    <span className={`block text-[10px] ${isSticker ? 'text-outline' : isMe ? 'text-white/70' : 'text-outline'} mt-1 text-right`}>{formatTime(msg.createdAt || msg.sentAt)}</span>
                   </div>
                 </div>
               );
@@ -538,6 +572,11 @@ export default function ChatWindowPage() {
                 </button>
               </div>
             )}
+            <StickerPicker
+              open={stickerPickerOpen}
+              onClose={() => setStickerPickerOpen(false)}
+              onSelect={handleSendSticker}
+            />
             <form onSubmit={handleSendMessage} className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-2 flex items-center gap-2 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
               <div className="flex items-center gap-1 px-2">
                 <button
@@ -576,6 +615,8 @@ export default function ChatWindowPage() {
                 placeholder={
                   uploadingType === 'VOICE'
                     ? 'Đang gửi tin nhắn thoại...'
+                    : uploadingType === 'STICKER'
+                      ? 'Đang gửi sticker...'
                     : uploadingType
                       ? 'Đang tải media...'
                       : isRecording
@@ -601,7 +642,17 @@ export default function ChatWindowPage() {
                 >
                   <span className="material-symbols-outlined">{isRecording ? 'stop' : 'mic'}</span>
                 </button>
-                <button type="button" className="p-2 text-outline hover:text-primary transition-colors" disabled={isRecording}>
+                <button
+                  type="button"
+                  onClick={() => setStickerPickerOpen((open) => !open)}
+                  disabled={uploadingType !== null || isRecording}
+                  title="Gửi sticker"
+                  className={`p-2 rounded-full transition-colors ${
+                    stickerPickerOpen
+                      ? 'text-primary bg-primary/10'
+                      : 'text-outline hover:text-primary'
+                  }`}
+                >
                   <span className="material-symbols-outlined">sentiment_satisfied</span>
                 </button>
                 <button

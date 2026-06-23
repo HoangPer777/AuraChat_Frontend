@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { normalizeAudioMimeType } from '../utils/voiceMessage'
 
 function pickMimeType() {
   if (typeof MediaRecorder === 'undefined') {
@@ -121,7 +122,7 @@ export default function useVoiceRecorder() {
 
         resolve({
           blob,
-          mimeType: blob.type || mimeTypeRef.current || 'audio/webm',
+          mimeType: normalizeAudioMimeType(blob.type || mimeTypeRef.current),
           durationSec,
         })
       }
