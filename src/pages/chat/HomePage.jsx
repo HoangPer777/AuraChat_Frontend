@@ -2,12 +2,15 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 import useChatStore from '../../store/chatStore';
+import useFriendStore from '../../store/friendStore';
 import api from '../../services/api';
+import { startOutgoingVideoCall } from '../../utils/callHelpers';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { conversations, setConversations, setActiveConversation, isOnline } = useChatStore();
+  const { loadFriends, isFriend } = useFriendStore();
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -22,7 +25,8 @@ export default function HomePage() {
     };
 
     fetchConversations();
-  }, [setConversations]);
+    loadFriends().catch(() => {});
+  }, [setConversations, loadFriends]);
 
   const handleConversationClick = (conversation) => {
     setActiveConversation(conversation);
@@ -68,6 +72,35 @@ export default function HomePage() {
     return other?.userId || null;
   };
 
+  const getConvPeer = (conv) => {
+    if (conv.type !== 'PRIVATE') return null;
+    const other = conv.members?.find(m => m.userId !== user?.id);
+    if (!other) return null;
+    return {
+      id: other.userId,
+      name: other.displayName || `User ${other.userId.slice(-6)}`,
+      avatar: other.avatarUrl,
+    };
+  };
+
+  const handleVideoCall = (event, conv) => {
+    event.stopPropagation();
+    const peer = getConvPeer(conv);
+    if (!peer?.id) return;
+
+    if (!isFriend(peer.id)) {
+      window.alert('Chỉ có thể gọi sau khi hai bên đã kết bạn.');
+      return;
+    }
+
+    startOutgoingVideoCall(navigate, {
+      conversationId: conv.id,
+      receiverId: peer.id,
+      receiverName: peer.name,
+      receiverAvatar: peer.avatar,
+    });
+  };
+
   return (
     <div className="h-screen overflow-hidden flex flex-1">
       {/* CONVERSATION LIST */}
@@ -93,8 +126,9 @@ export default function HomePage() {
               const lastTime = formatTime(conv.lastMessage?.sentAt || conv.updatedAt);
               const peerId = getConvPeerId(conv);
               const peerOnline = peerId ? isOnline(peerId) : false;
+              const canCall = conv.type === 'PRIVATE' && peerId && isFriend(peerId);
               return (
-                <div key={conv.id} onClick={() => handleConversationClick(conv)} className="p-3 flex items-center gap-3 hover:bg-surface-container-low cursor-pointer rounded-xl transition-all">
+                <div key={conv.id} onClick={() => handleConversationClick(conv)} className="p-3 flex items-center gap-3 hover:bg-surface-container-low cursor-pointer rounded-xl transition-all group">
                   <div className="relative shrink-0">
                     <img alt={convName} className="w-12 h-12 rounded-full object-cover" src={convAvatar} />
                     {peerOnline && <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-surface-container rounded-full"></div>}
@@ -108,6 +142,16 @@ export default function HomePage() {
                       <p className="text-xs text-on-surface-variant truncate">{lastMsg}</p>
                     </div>
                   </div>
+                  {canCall && (
+                    <button
+                      type="button"
+                      onClick={(event) => handleVideoCall(event, conv)}
+                      className="shrink-0 p-2 rounded-full text-primary opacity-0 group-hover:opacity-100 hover:bg-primary-container/20 transition-all"
+                      aria-label="Gọi video"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">videocam</span>
+                    </button>
+                  )}
                 </div>
               );
             })

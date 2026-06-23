@@ -4,7 +4,7 @@ import useAuthStore from '../../store/authStore'
 import useFriendStore from '../../store/friendStore'
 import usePresenceStore from '../../store/presenceStore'
 import { searchUsers, discoverUsers } from '../../services/friendService'
-import { saveCallSession } from '../../utils/callSession'
+import { startOutgoingVideoCall } from '../../utils/callHelpers'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function getDisplayName(user) {
@@ -375,16 +375,11 @@ export default function FriendsPage() {
   const handleVideoCall = (friend) => {
     if (!friend?.id) return
 
-    const callSession = {
-      mode: 'outgoing',
-      type: 'VIDEO',
+    startOutgoingVideoCall(navigate, {
       receiverId: friend.id,
       receiverName: getDisplayName(friend),
       receiverAvatar: getAvatar(friend),
-    }
-
-    saveCallSession(callSession)
-    navigate('/call/video', { state: callSession })
+    })
   }
 
   const isSearching = searchTerm.trim().length > 0

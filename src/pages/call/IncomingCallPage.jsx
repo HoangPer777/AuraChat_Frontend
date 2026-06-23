@@ -1,39 +1,71 @@
-import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import useAuthStore from '../../store/authStore';
-import { clearCallSession, loadCallSession, saveCallSession } from '../../utils/callSession';
-import { publishCallEnd } from '../../services/callService';
+import React, { useCallback, useEffect, useMemo } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import useAuthStore from '../../store/authStore'
+import { clearCallSession, loadCallSession, saveCallSession } from '../../utils/callSession'
+import { publishCallEnd } from '../../services/callService'
+import { startIncomingRing, stopRing } from '../../utils/callRingtone'
+import { getTerminalCallMessage } from '../../utils/callHelpers'
+import useCallEndListener from '../../hooks/useCallEndListener'
 
 export default function IncomingCallPage() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { user } = useAuthStore();
-  const incomingCall = location.state || loadCallSession();
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { user } = useAuthStore()
+
+  const incomingCall = useMemo(
+    () => location.state || loadCallSession(),
+    [location.state]
+  )
+
+  const leaveCallScreen = useCallback((message) => {
+    stopRing()
+    clearCallSession()
+    if (message?.status) {
+      window.alert(getTerminalCallMessage(message.status))
+    }
+    navigate('/chat', { replace: true })
+  }, [navigate])
+
+  useCallEndListener(incomingCall?.callId, leaveCallScreen)
+
+  useEffect(() => {
+    if (!incomingCall?.callId) return undefined
+
+    startIncomingRing()
+    return () => stopRing()
+  }, [incomingCall?.callId])
 
   if (!incomingCall) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-on-background">
         <div className="text-center space-y-4">
           <p className="text-lg font-semibold">Không tìm thấy dữ liệu cuộc gọi</p>
-          <button onClick={() => navigate('/chat')} className="px-4 py-2 rounded-xl bg-primary text-white">Về trang chat</button>
+          <button onClick={() => navigate('/chat')} className="px-4 py-2 rounded-xl bg-primary text-white">
+            Về trang chat
+          </button>
         </div>
       </div>
     )
   }
 
   const callerName = incomingCall.callerName || incomingCall.senderName || 'Cuộc gọi đến'
-  const callerAvatar = incomingCall.callerAvatar || incomingCall.senderAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(callerName)}`
+  const callerAvatar = incomingCall.callerAvatar || incomingCall.senderAvatar
+    || `https://ui-avatars.com/api/?name=${encodeURIComponent(callerName)}`
 
   const handleDecline = async () => {
+    stopRing()
     try {
-      await publishCallEnd({ callId: incomingCall.callId })
+      if (incomingCall.callId) {
+        await publishCallEnd({ callId: incomingCall.callId, status: 'DECLINED' })
+      }
     } finally {
       clearCallSession()
-      navigate(-1)
+      navigate('/chat', { replace: true })
     }
   }
 
   const handleAccept = () => {
+    stopRing()
     const acceptedCall = {
       ...incomingCall,
       mode: 'incoming',
@@ -45,65 +77,44 @@ export default function IncomingCallPage() {
   }
 
   return (
-    <div className="bg-background font-sans text-on-background min-h-screen flex">
-      {/* Side Rail (Static) */}
-      <aside className="fixed left-0 top-0 h-full w-[80px] flex flex-col items-center py-4 z-50 bg-surface-container-low border-r border-outline-variant shrink-0">
-         <div className="text-primary font-bold text-2xl mb-8">AC</div>
-      </aside>
-
-      {/* Main Content (Blurred) */}
-      <main className="ml-[80px] flex-1 flex flex-col blur-[2px] opacity-40 pointer-events-none">
-        <header className="h-16 border-b border-outline-variant px-6 flex items-center">
-          <h1 className="text-xl font-bold">Tin nhắn</h1>
-        </header>
-        <div className="flex-1 bg-surface-bright p-8">
-           <div className="max-w-md bg-white p-6 rounded-2xl shadow-sm border border-outline-variant">
-              <div className="flex gap-4">
-                 <div className="w-12 h-12 bg-surface-container rounded-full"></div>
-                 <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-surface-container rounded w-3/4"></div>
-                    <div className="h-3 bg-surface-container rounded w-1/2"></div>
-                 </div>
-              </div>
-           </div>
-        </div>
-      </main>
-
-      {/* Incoming Call Popup */}
-      <div className="fixed top-8 right-8 z-[100] w-[320px] animate-in slide-in-from-right-10 fade-in duration-500">
+    <div className="bg-background font-sans text-on-background min-h-screen flex items-center justify-center p-4">
+      <div className="w-full max-w-[360px] animate-in slide-in-from-right-10 fade-in duration-500">
         <div className="bg-[#1e1e2e] p-8 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col items-center border border-white/5">
-          {/* Pulsing Avatar */}
           <div className="relative mb-6">
-            <div className="absolute inset-[-8px] border-2 border-primary/40 rounded-full animate-ping opacity-20"></div>
-            <div className="absolute inset-[-12px] border-2 border-primary/20 rounded-full animate-ping delay-150 opacity-10"></div>
-            <div className="w-20 h-20 rounded-full border-2 border-white/10 p-1">
-              <img 
-                src={callerAvatar} 
-                className="w-full h-full rounded-full object-cover" 
+            <div className="absolute inset-[-8px] border-2 border-primary/40 rounded-full animate-ping opacity-20" />
+            <div className="absolute inset-[-12px] border-2 border-primary/20 rounded-full animate-ping delay-150 opacity-10" />
+            <div className="w-24 h-24 rounded-full border-2 border-white/10 p-1">
+              <img
+                src={callerAvatar}
+                className="w-full h-full rounded-full object-cover"
                 alt={callerName}
               />
             </div>
           </div>
 
           <h3 className="text-white font-bold text-xl mb-1">{callerName}</h3>
-          <p className="text-white/50 text-xs font-medium tracking-widest uppercase mb-8">Cuộc gọi video đến</p>
+          <p className="text-white/50 text-xs font-medium tracking-widest uppercase mb-8">
+            Cuộc gọi video đến
+          </p>
 
-          <div className="flex gap-8 items-center justify-center w-full">
+          <div className="flex gap-10 items-center justify-center w-full">
             <div className="flex flex-col items-center gap-3">
-              <button 
+              <button
+                type="button"
                 onClick={handleDecline}
-                className="w-14 h-14 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-all hover:scale-110 active:scale-95 shadow-lg shadow-red-500/20"
+                className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-all hover:scale-110 active:scale-95 shadow-lg shadow-red-500/20"
               >
-                <span className="material-symbols-outlined text-[28px]">call_end</span>
+                <span className="material-symbols-outlined text-[30px]">call_end</span>
               </button>
               <span className="text-white/40 text-[10px] font-bold uppercase tracking-wider">Từ chối</span>
             </div>
             <div className="flex flex-col items-center gap-3">
-              <button 
+              <button
+                type="button"
                 onClick={handleAccept}
-                className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center text-white hover:bg-green-600 transition-all hover:scale-110 active:scale-95 shadow-lg shadow-green-500/20"
+                className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center text-white hover:bg-green-600 transition-all hover:scale-110 active:scale-95 shadow-lg shadow-green-500/20"
               >
-                <span className="material-symbols-outlined text-[28px]">videocam</span>
+                <span className="material-symbols-outlined text-[30px]">videocam</span>
               </button>
               <span className="text-white/40 text-[10px] font-bold uppercase tracking-wider">Chấp nhận</span>
             </div>
@@ -111,5 +122,5 @@ export default function IncomingCallPage() {
         </div>
       </div>
     </div>
-  );
+  )
 }

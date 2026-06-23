@@ -7,7 +7,7 @@ import api from '../../services/api';
 import useIncomingCallNotifications from '../../hooks/useIncomingCallNotifications';
 import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications';
 import useChatWebSocket from '../../hooks/useChatWebSocket';
-import { saveCallSession } from '../../utils/callSession';
+import { startOutgoingVideoCall } from '../../utils/callHelpers';
 
 export default function ChatPage() {
   const navigate = useNavigate();
@@ -129,17 +129,12 @@ export default function ChatPage() {
       return
     }
 
-    const callSession = {
-      mode: 'outgoing',
-      type: 'VIDEO',
+    startOutgoingVideoCall(navigate, {
       conversationId: activeConversation.id,
       receiverId: peer.id,
       receiverName: peer.name,
       receiverAvatar: peer.avatar,
-    };
-
-    saveCallSession(callSession);
-    navigate('/test-ui/video-call', { state: callSession });
+    });
   };
 
   // Lấy tên hiển thị của conversation

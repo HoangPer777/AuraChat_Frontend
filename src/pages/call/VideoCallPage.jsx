@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
 import { connect, isConnected, subscribe } from '../../services/websocket'
 import { clearCallSession, loadCallSession, saveCallSession } from '../../utils/callSession'
+import { getTerminalCallMessage, isCallRingingAck } from '../../utils/callHelpers'
+import { startOutgoingRing, stopRing } from '../../utils/callRingtone'
 import {
   createPeerConnection,
   getLocalStream,
@@ -11,14 +13,6 @@ import {
   publishCallOffer,
   publishIceCandidate,
 } from '../../services/callService'
-
-function generateCallId() {
-  if (window.crypto?.randomUUID) {
-    return `call_${window.crypto.randomUUID()}`
-  }
-
-  return `call_${Date.now()}_${Math.random().toString(16).slice(2)}`
-}
 
 export default function VideoCallPage() {
   const navigate = useNavigate()
@@ -49,6 +43,21 @@ export default function VideoCallPage() {
   const pendingRemoteCandidatesRef = useRef([])
   const pendingLocalCandidatesRef = useRef([])
   const callIdRef = useRef(callIntent?.callId || null)
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
+
+  useEffect(() => {
+    if (callStatus === 'ringing') {
+      startOutgoingRing()
+      return () => stopRing()
+    }
+
+    if (callStatus === 'connected' || callStatus === 'ended') {
+      stopRing()
+    }
+
+    return undefined
+  }, [callStatus])
 
   useEffect(() => {
     if (!callIntent) {
@@ -189,6 +198,10 @@ export default function VideoCallPage() {
     const isMessageForCurrentCall = (message) => {
       if (!message) return false
 
+      if (isCallRingingAck(message) && callIntent.mode === 'outgoing') {
+        return true
+      }
+
       if (callIntent.mode === 'incoming') {
         if (!callIdRef.current || !message.callId) return true
         return message.callId === callIdRef.current
@@ -212,6 +225,15 @@ export default function VideoCallPage() {
       return true
     }
 
+    const finishCall = (message) => {
+      stopRing()
+      setCallStatus('ended')
+      setStatusText(getTerminalCallMessage(message?.status) || message?.message || 'Cuộc gọi đã kết thúc')
+      cleanupMedia()
+      clearCallSession()
+      window.setTimeout(() => navigateRef.current('/chat', { replace: true }), 600)
+    }
+
     const handleCallMessage = async (message) => {
       if (!mounted || !message) return
 
@@ -221,6 +243,10 @@ export default function VideoCallPage() {
 
       if (message.callId) {
         resolveCallId(message.callId)
+      }
+
+      if (isCallRingingAck(message)) {
+        return
       }
 
       if (message.candidate) {
@@ -245,10 +271,7 @@ export default function VideoCallPage() {
       }
 
       if (message.status === 'DECLINED' || message.status === 'COMPLETED' || message.status === 'MISSED') {
-        setCallStatus('ended')
-        setStatusText(message.message || 'Cuộc gọi đã kết thúc')
-        cleanupMedia()
-        clearCallSession()
+        finishCall(message)
         return
       }
 
@@ -376,7 +399,6 @@ export default function VideoCallPage() {
         setStatusText('Đang đổ chuông...')
         saveCallSession({
           ...callIntent,
-          clientCallId: generateCallId(),
           createdAt: new Date().toISOString(),
         })
       }
@@ -419,13 +441,16 @@ export default function VideoCallPage() {
   }
 
   const handleEndCall = async () => {
+    stopRing()
     try {
-      await publishCallEnd({ callId: callIdRef.current })
+      if (callIdRef.current) {
+        publishCallEnd({ callId: callIdRef.current })
+      }
     } finally {
       clearCallSession()
       localStreamRef.current?.getTracks?.().forEach((track) => track.stop())
       peerConnectionRef.current?.close?.()
-      navigate(-1)
+      navigate('/chat', { replace: true })
     }
   }
 

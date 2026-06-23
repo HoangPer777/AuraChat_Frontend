@@ -6,7 +6,7 @@ import useFriendStore from '../../store/friendStore';
 import api from '../../services/api';
 import { createPrivateConversation } from '../../services/friendService';
 import { uploadFile, uploadImage } from '../../services/mediaService';
-import { saveCallSession } from '../../utils/callSession';
+import { startOutgoingVideoCall } from '../../utils/callHelpers';
 
 export default function ChatWindowPage() {
   const navigate = useNavigate();
@@ -277,17 +277,12 @@ export default function ChatWindowPage() {
       return
     }
 
-    const callSession = {
-      mode: 'outgoing',
-      type: 'VIDEO',
+    startOutgoingVideoCall(navigate, {
       conversationId: activeConversation.id,
       receiverId: peer.id,
       receiverName: peer.name,
       receiverAvatar: peer.avatar,
-    };
-
-    saveCallSession(callSession);
-    navigate('/call/video', { state: callSession });
+    });
   };
 
   const formatTime = (isoString) => {

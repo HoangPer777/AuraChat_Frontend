@@ -66,6 +66,7 @@ export function publishIceCandidate(payload) {
   return send('/app/call/ice-candidate', payload)
 }
 
-export function publishCallEnd(payload) {
+export function publishCallEnd({ callId, status = null }) {
+  const payload = status ? { callId, status } : { callId }
   return send('/app/call/end', payload)
 }
