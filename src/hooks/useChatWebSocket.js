@@ -5,8 +5,8 @@ import useChatStore from '../store/chatStore'
 import { isMessageForActiveConversation } from '../utils/chatMessages'
 
 /**
- * Subscribe real-time messages và presence qua STOMP.
- * Được mount một lần trong UserLayout.
+ * Subscribe real-time messages qua STOMP.
+ * Presence được xử lý riêng trong usePresenceSync.
  */
 export default function useChatWebSocket() {
   const { accessToken, user } = useAuthStore()
@@ -16,7 +16,6 @@ export default function useChatWebSocket() {
 
     let active = true
     let removeMessagesListener = null
-    let removePresenceListener = null
 
     const setup = async () => {
       try {
@@ -47,14 +46,6 @@ export default function useChatWebSocket() {
             type: message.type,
           })
         })
-
-        removePresenceListener = subscribe('/user/queue/presence', (presence) => {
-          if (!active || !presence?.userId) return
-          useChatStore.getState().setFriendOnlineStatus(
-            presence.userId,
-            presence.status === 'online'
-          )
-        })
       } catch (error) {
         console.warn('Chat WebSocket subscription failed:', error)
       }
@@ -65,7 +56,6 @@ export default function useChatWebSocket() {
     return () => {
       active = false
       removeMessagesListener?.()
-      removePresenceListener?.()
     }
   }, [accessToken, user?.id])
 }

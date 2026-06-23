@@ -6,6 +6,7 @@ import { clearCallSession, loadCallSession, saveCallSession } from '../../utils/
 import { getTerminalCallMessage, isCallRingingAck } from '../../utils/callHelpers'
 import { startOutgoingRing, stopRing } from '../../utils/callRingtone'
 import {
+  attachStreamToVideo,
   createPeerConnection,
   getLocalStream,
   publishCallAnswer,
@@ -34,15 +35,20 @@ export default function VideoCallPage() {
   })
   const [isMicOn, setIsMicOn] = useState(true)
   const [isCamOn, setIsCamOn] = useState(true)
+  const [hasVideoTrack, setHasVideoTrack] = useState(true)
+  const [localPreviewStream, setLocalPreviewStream] = useState(null)
+  const [remotePreviewStream, setRemotePreviewStream] = useState(null)
   const [callStatus, setCallStatus] = useState('connecting')
   const [statusText, setStatusText] = useState('Đang khởi tạo cuộc gọi...')
   const localVideoRef = useRef(null)
   const remoteVideoRef = useRef(null)
+  const remoteAudioRef = useRef(null)
   const localStreamRef = useRef(null)
   const peerConnectionRef = useRef(null)
   const pendingRemoteCandidatesRef = useRef([])
   const pendingLocalCandidatesRef = useRef([])
   const callIdRef = useRef(callIntent?.callId || null)
+  const selfEndedRef = useRef(false)
   const navigateRef = useRef(navigate)
   navigateRef.current = navigate
 
@@ -64,6 +70,30 @@ export default function VideoCallPage() {
       navigate('/chat', { replace: true })
     }
   }, [callIntent, navigate])
+
+  useEffect(() => {
+    if (!localPreviewStream || !localVideoRef.current || !isCamOn) return undefined
+
+    attachStreamToVideo(localVideoRef.current, localPreviewStream)
+
+    return undefined
+  }, [localPreviewStream, isCamOn])
+
+  useEffect(() => {
+    if (!remotePreviewStream || !remoteVideoRef.current) return undefined
+
+    attachStreamToVideo(remoteVideoRef.current, remotePreviewStream)
+
+    return undefined
+  }, [remotePreviewStream])
+
+  useEffect(() => {
+    if (!remotePreviewStream || !remoteAudioRef.current) return undefined
+
+    attachStreamToVideo(remoteAudioRef.current, remotePreviewStream)
+
+    return undefined
+  }, [remotePreviewStream])
 
   useEffect(() => {
     if (callStatus !== 'connected' || !callStartedAt) {
@@ -90,6 +120,8 @@ export default function VideoCallPage() {
     const cleanupMedia = () => {
       localStreamRef.current?.getTracks?.().forEach((track) => track.stop())
       localStreamRef.current = null
+      setLocalPreviewStream(null)
+      setRemotePreviewStream(null)
 
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = null
@@ -97,6 +129,10 @@ export default function VideoCallPage() {
 
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = null
+      }
+
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = null
       }
 
       peerConnectionRef.current?.close?.()
@@ -231,7 +267,25 @@ export default function VideoCallPage() {
       setStatusText(getTerminalCallMessage(message?.status) || message?.message || 'Cuộc gọi đã kết thúc')
       cleanupMedia()
       clearCallSession()
-      window.setTimeout(() => navigateRef.current('/chat', { replace: true }), 600)
+
+      const isOutgoingCaller = callIntent.mode === 'outgoing'
+      const peerDeclined = message?.status === 'DECLINED' || message?.status === 'MISSED'
+      const shouldShowBusyNotice = isOutgoingCaller && peerDeclined && !selfEndedRef.current
+
+      window.setTimeout(() => {
+        if (shouldShowBusyNotice && callIntent.receiverId) {
+          navigateRef.current('/chat/window', {
+            replace: true,
+            state: {
+              friendId: callIntent.receiverId,
+              callNotice: 'busy',
+            },
+          })
+          return
+        }
+
+        navigateRef.current('/chat', { replace: true })
+      }, 600)
     }
 
     const handleCallMessage = async (message) => {
@@ -287,16 +341,10 @@ export default function VideoCallPage() {
       }
     }
 
-    const attachStreamToLocalPreview = (stream) => {
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream
-      }
-    }
-
     const attachRemoteStream = (event) => {
       const [remoteStream] = event.streams
-      if (remoteVideoRef.current && remoteStream) {
-        remoteVideoRef.current.srcObject = remoteStream
+      if (remoteStream) {
+        setRemotePreviewStream(remoteStream)
       }
     }
 
@@ -326,16 +374,21 @@ export default function VideoCallPage() {
     }
 
     const createConnection = async () => {
-      const localStream = await getLocalStream(callIntent.type || 'VIDEO')
+      const callType = callIntent.type || 'VIDEO'
+      const isAudioCall = callType === 'AUDIO'
+      const localStream = await getLocalStream(callType)
       if (!mounted) return
 
-      const hasVideoTrack = localStream.getVideoTracks().length > 0
-      if (!hasVideoTrack) {
+      const streamHasVideo = localStream.getVideoTracks().length > 0
+      setHasVideoTrack(streamHasVideo)
+      if (!streamHasVideo || isAudioCall) {
         setIsCamOn(false)
       }
 
       localStreamRef.current = localStream
-      attachStreamToLocalPreview(localStream)
+      if (!isAudioCall && streamHasVideo) {
+        setLocalPreviewStream(localStream)
+      }
 
       const peerConnection = createPeerConnection({
         onTrack: attachRemoteStream,
@@ -381,12 +434,15 @@ export default function VideoCallPage() {
         syncConnectedTime(acceptedAt)
         await flushBufferedCandidates()
       } else {
-        const offer = await peerConnection.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true })
+        const offer = await peerConnection.createOffer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: !isAudioCall,
+        })
         await peerConnection.setLocalDescription(offer)
 
         const published = await publishCallOffer({
           receiverId: callIntent.receiverId,
-          type: callIntent.type || 'VIDEO',
+          type: callType,
           conversationId: callIntent.conversationId,
           sdp: offer.sdp,
         })
@@ -442,6 +498,7 @@ export default function VideoCallPage() {
 
   const handleEndCall = async () => {
     stopRing()
+    selfEndedRef.current = true
     try {
       if (callIdRef.current) {
         publishCallEnd({ callId: callIdRef.current })
@@ -456,9 +513,83 @@ export default function VideoCallPage() {
 
   const remoteName = callIntent?.receiverName || callIntent?.callerName || 'Đang gọi'
   const localLabel = user?.displayName || user?.email || 'Bạn'
+  const isAudioCall = (callIntent?.type || 'VIDEO') === 'AUDIO'
+  const remoteAvatar = callIntent?.receiverAvatar || callIntent?.callerAvatar
+    || `https://ui-avatars.com/api/?name=${encodeURIComponent(remoteName)}`
 
   if (!callIntent) {
     return null
+  }
+
+  if (isAudioCall) {
+    return (
+      <div className="bg-[#121218] font-sans text-white min-h-screen flex items-center justify-center p-4 relative">
+        <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+
+        <div className="w-full max-w-[400px] h-[min(640px,90vh)] bg-gradient-to-br from-[#1e1e2e] to-[#121218] rounded-[40px] shadow-2xl border border-white/5 flex flex-col items-center justify-between p-10 relative overflow-hidden">
+          <div className="absolute top-[-10%] left-[-10%] w-[300px] h-[300px] bg-primary/20 rounded-full blur-[100px] animate-pulse" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[300px] h-[300px] bg-secondary/20 rounded-full blur-[100px] animate-pulse" />
+
+          <div className="w-full flex justify-between items-center z-10">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold tracking-widest text-primary uppercase">Cuộc gọi thoại</span>
+              {callStatus === 'connected' && (
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              )}
+            </div>
+            <span className="text-xs font-bold text-primary-fixed-dim tracking-widest">{formatTime(timer)}</span>
+          </div>
+
+          <div className="flex flex-col items-center z-10">
+            <div className="relative mb-8">
+              {callStatus === 'ringing' && (
+                <div className="absolute inset-[-15px] border border-primary/20 rounded-full animate-ping opacity-20" />
+              )}
+              <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-primary to-secondary shadow-2xl shadow-primary/20">
+                <img
+                  src={remoteAvatar}
+                  className="w-full h-full rounded-full object-cover border-4 border-[#1e1e2e]"
+                  alt={remoteName}
+                />
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight text-center">{remoteName}</h2>
+            <p className="text-white/50 text-sm mt-2">{statusText}</p>
+          </div>
+
+          <div className="flex items-center gap-1.5 h-12 w-full justify-center z-10">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div
+                key={i}
+                className={`w-1 rounded-full transition-all ${callStatus === 'connected' ? 'bg-primary/60 animate-pulse' : 'bg-primary/20'}`}
+                style={{ height: `${20 + (i % 4) * 12}%`, animationDelay: `${i * 0.08}s` }}
+              />
+            ))}
+          </div>
+
+          <div className="w-full bg-white/5 backdrop-blur-2xl rounded-[32px] p-6 flex items-center justify-center gap-6 z-10 border border-white/10">
+            <button
+              type="button"
+              onClick={() => {
+                const next = !isMicOn
+                setIsMicOn(next)
+                toggleTrack('audio', next)
+              }}
+              className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500 hover:bg-red-600'}`}
+            >
+              <span className="material-symbols-outlined">{isMicOn ? 'mic' : 'mic_off'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleEndCall}
+              className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white shadow-xl shadow-red-500/20 hover:scale-105 active:scale-95 transition-all"
+            >
+              <span className="material-symbols-outlined text-[32px]">call_end</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -480,11 +611,18 @@ export default function VideoCallPage() {
       </header>
 
       {/* Picture in Picture (Self View) */}
-      <div className="absolute bottom-32 right-8 z-30 w-48 aspect-[4/3] rounded-3xl overflow-hidden border-2 border-white/20 shadow-2xl group transition-transform hover:scale-105 bg-black">
-        <video ref={localVideoRef} autoPlay muted playsInline className={`w-full h-full object-cover ${isCamOn ? '' : 'hidden'}`} />
-        {!isCamOn && (
+      <div className="absolute bottom-32 right-8 z-30 w-48 aspect-[4/3] rounded-3xl overflow-hidden border-2 border-white/20 shadow-2xl group transition-transform hover:scale-105 bg-[#1e1e2e]">
+        {isCamOn && hasVideoTrack ? (
+          <video
+            ref={localVideoRef}
+            autoPlay
+            muted
+            playsInline
+            className="w-full h-full object-cover scale-x-[-1]"
+          />
+        ) : (
           <div className="w-full h-full bg-[#1e1e2e] flex items-center justify-center">
-             <span className="material-symbols-outlined text-4xl text-white/20">videocam_off</span>
+            <span className="material-symbols-outlined text-4xl text-white/20">videocam_off</span>
           </div>
         )}
         <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-black/40 px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-widest backdrop-blur-md">

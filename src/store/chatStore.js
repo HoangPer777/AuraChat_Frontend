@@ -23,8 +23,8 @@ const useChatStore = create((set, get) => ({
   messages: [],
   isLoading: false,
   error: null,
-  /** Set of userIds currently online */
-  onlineUsers: new Set(),
+  /** userId -> true when online */
+  onlineByUserId: {},
 
   // Actions
   /**
@@ -90,16 +90,26 @@ const useChatStore = create((set, get) => ({
    * Update online status of a friend (called on presence WebSocket event).
    */
   setFriendOnlineStatus: (userId, isOnline) =>
-    set((state) => ({
-      onlineUsers: isOnline
-        ? new Set([...state.onlineUsers, userId])
-        : new Set([...state.onlineUsers].filter((id) => id !== userId)),
-    })),
+    set((state) => {
+      if (!userId) return state
+
+      if (isOnline) {
+        if (state.onlineByUserId[userId]) return state
+        return {
+          onlineByUserId: { ...state.onlineByUserId, [userId]: true },
+        }
+      }
+
+      if (!state.onlineByUserId[userId]) return state
+      const next = { ...state.onlineByUserId }
+      delete next[userId]
+      return { onlineByUserId: next }
+    }),
 
   /**
    * Check if a user is online.
    */
-  isOnline: (userId) => get().onlineUsers.has(userId),
+  isOnline: (userId) => Boolean(get().onlineByUserId[userId]),
 
   /**
    * Set loading state for chat operations

@@ -1,6 +1,5 @@
 import { Outlet } from 'react-router-dom'
 import UserSideRail, { USER_SIDE_RAIL_WIDTH } from './UserSideRail'
-import UserFooter from './UserFooter'
 
 export default function UserLayout() {
   return (
@@ -12,7 +11,6 @@ export default function UserLayout() {
       >
         <Outlet />
       </div>
-      <UserFooter />
     </div>
   )
 }

@@ -14,7 +14,6 @@ import CreateGroupPage from './pages/chat/CreateGroupPage'
 import NotificationsPage from './pages/chat/NotificationsPage'
 import IncomingCallPage from './pages/call/IncomingCallPage'
 import CallingPage from './pages/call/CallingPage'
-import AudioCallPage from './pages/call/AudioCallPage'
 import VideoCallPage from './pages/call/VideoCallPage'
 import DashboardPage from './pages/admin/DashboardPage'
 import UsersPage from './pages/admin/UsersPage'
@@ -88,7 +87,7 @@ function App() {
               </Route>
               <Route path="/call/incoming" element={<IncomingCallPage />} />
               <Route path="/call/outgoing" element={<CallingPage />} />
-              <Route path="/call/audio" element={<AudioCallPage />} />
+              <Route path="/call/audio" element={<VideoCallPage />} />
               <Route path="/call/video" element={<VideoCallPage />} />
             </Route>
           </Route>

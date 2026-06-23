@@ -4,12 +4,14 @@ import useAuthStore from '../../store/authStore';
 import useChatStore from '../../store/chatStore';
 import useFriendStore from '../../store/friendStore';
 import api from '../../services/api';
-import { startOutgoingVideoCall } from '../../utils/callHelpers';
+import { startOutgoingVideoCall, startOutgoingAudioCall } from '../../utils/callHelpers';
+import OnlineIndicator from '../../components/user/OnlineIndicator';
+import { formatCallLogText } from '../../utils/callLogMessage';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { conversations, setConversations, setActiveConversation, isOnline } = useChatStore();
+  const { conversations, setConversations, setActiveConversation } = useChatStore();
   const { loadFriends, isFriend } = useFriendStore();
 
   useEffect(() => {
@@ -56,6 +58,18 @@ export default function HomePage() {
   // Lấy preview tin nhắn cuối
   const getLastMessagePreview = (conv) => {
     if (!conv.lastMessage) return 'Chưa có tin nhắn';
+    if (conv.lastMessage.type === 'CALL_LOG') {
+      return formatCallLogText(conv.lastMessage.content);
+    }
+    if (conv.lastMessage.type === 'VOICE') {
+      return 'Tin nhắn thoại';
+    }
+    if (conv.lastMessage.type === 'IMAGE') {
+      return 'Đã gửi một hình ảnh';
+    }
+    if (conv.lastMessage.type === 'FILE') {
+      return 'Đã gửi một tệp';
+    }
     return conv.lastMessage.content || 'Đã gửi một tin nhắn';
   };
 
@@ -83,7 +97,7 @@ export default function HomePage() {
     };
   };
 
-  const handleVideoCall = (event, conv) => {
+  const handlePeerCall = (event, conv, callType) => {
     event.stopPropagation();
     const peer = getConvPeer(conv);
     if (!peer?.id) return;
@@ -93,12 +107,19 @@ export default function HomePage() {
       return;
     }
 
-    startOutgoingVideoCall(navigate, {
+    const params = {
       conversationId: conv.id,
       receiverId: peer.id,
       receiverName: peer.name,
       receiverAvatar: peer.avatar,
-    });
+    };
+
+    if (callType === 'AUDIO') {
+      startOutgoingAudioCall(navigate, params);
+      return;
+    }
+
+    startOutgoingVideoCall(navigate, params);
   };
 
   return (
@@ -125,13 +146,15 @@ export default function HomePage() {
               const lastMsg = getLastMessagePreview(conv);
               const lastTime = formatTime(conv.lastMessage?.sentAt || conv.updatedAt);
               const peerId = getConvPeerId(conv);
-              const peerOnline = peerId ? isOnline(peerId) : false;
               const canCall = conv.type === 'PRIVATE' && peerId && isFriend(peerId);
               return (
                 <div key={conv.id} onClick={() => handleConversationClick(conv)} className="p-3 flex items-center gap-3 hover:bg-surface-container-low cursor-pointer rounded-xl transition-all group">
                   <div className="relative shrink-0">
                     <img alt={convName} className="w-12 h-12 rounded-full object-cover" src={convAvatar} />
-                    {peerOnline && <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-surface-container rounded-full"></div>}
+                    <OnlineIndicator
+                      userId={peerId}
+                      className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-surface-container rounded-full"
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-baseline">
@@ -143,14 +166,24 @@ export default function HomePage() {
                     </div>
                   </div>
                   {canCall && (
-                    <button
-                      type="button"
-                      onClick={(event) => handleVideoCall(event, conv)}
-                      className="shrink-0 p-2 rounded-full text-primary opacity-0 group-hover:opacity-100 hover:bg-primary-container/20 transition-all"
-                      aria-label="Gọi video"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">videocam</span>
-                    </button>
+                    <div className="flex shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                      <button
+                        type="button"
+                        onClick={(event) => handlePeerCall(event, conv, 'AUDIO')}
+                        className="p-2 rounded-full text-primary hover:bg-primary-container/20 transition-all"
+                        aria-label="Gọi thoại"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">call</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => handlePeerCall(event, conv, 'VIDEO')}
+                        className="p-2 rounded-full text-primary hover:bg-primary-container/20 transition-all"
+                        aria-label="Gọi video"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">videocam</span>
+                      </button>
+                    </div>
                   )}
                 </div>
               );

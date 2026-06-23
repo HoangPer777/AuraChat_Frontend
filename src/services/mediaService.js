@@ -20,6 +20,13 @@ export const uploadFile = async (file) => {
   return response.data
 }
 
+export const uploadAudio = async (file) => {
+  const response = await api.post('/media/upload/audio', buildFormData(file), {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return response.data
+}
+
 export const listMedia = async (params = { page: 0, size: 20 }) => {
   const response = await api.get('/media', { params })
   return response.data
@@ -38,6 +45,7 @@ export const deleteMedia = async (mediaId) => {
 export default {
   uploadImage,
   uploadFile,
+  uploadAudio,
   listMedia,
   getMediaDetail,
   deleteMedia,

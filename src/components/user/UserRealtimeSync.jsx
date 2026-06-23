@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import useIncomingCallNotifications from '../../hooks/useIncomingCallNotifications'
 import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications'
 import useChatWebSocket from '../../hooks/useChatWebSocket'
+import usePresenceSync from '../../hooks/usePresenceSync'
 import useFriendStore from '../../store/friendStore'
 
 /**
@@ -10,14 +11,17 @@ import useFriendStore from '../../store/friendStore'
  */
 export default function UserRealtimeSync() {
   const loadPendingRequests = useFriendStore((s) => s.loadPendingRequests)
+  const loadFriends = useFriendStore((s) => s.loadFriends)
 
   useIncomingCallNotifications()
   useFriendRequestNotifications()
   useChatWebSocket()
+  usePresenceSync()
 
   useEffect(() => {
     loadPendingRequests().catch(() => {})
-  }, [loadPendingRequests])
+    loadFriends().catch(() => {})
+  }, [loadPendingRequests, loadFriends])
 
   return <Outlet />
 }

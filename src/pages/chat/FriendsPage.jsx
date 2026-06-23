@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
 import useFriendStore from '../../store/friendStore'
+import useChatStore from '../../store/chatStore'
 import usePresenceStore from '../../store/presenceStore'
 import { searchUsers, discoverUsers } from '../../services/friendService'
-import { startOutgoingVideoCall } from '../../utils/callHelpers'
+import { startOutgoingVideoCall, startOutgoingAudioCall } from '../../utils/callHelpers'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function getDisplayName(user) {
@@ -21,8 +22,7 @@ function getAvatar(user) {
 
 // ─── Online dot ───────────────────────────────────────────────────────────────
 function OnlineDot({ userId }) {
-  const presenceMap = usePresenceStore((s) => s.presenceMap)
-  const isOnline = presenceMap[userId]?.status === 'online'
+  const isOnline = useChatStore((state) => Boolean(userId && state.onlineByUserId[userId]))
   return (
     <span
       className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
@@ -33,10 +33,10 @@ function OnlineDot({ userId }) {
 }
 
 // ─── User Profile Drawer ──────────────────────────────────────────────────────
-function ProfileDrawer({ user, isFriend, onClose, onChat, onVideoCall, onAddFriend, onUnfriend }) {
+function ProfileDrawer({ user, isFriend, onClose, onChat, onVideoCall, onAudioCall, onAddFriend, onUnfriend }) {
   const presenceMap = usePresenceStore((s) => s.presenceMap)
   const presence = presenceMap[user?.id]
-  const isOnline = presence?.status === 'online'
+  const isOnline = useChatStore((state) => Boolean(user?.id && state.onlineByUserId[user.id]))
   const [reqStatus, setReqStatus] = useState('idle')
   const [unfriendConfirm, setUnfriendConfirm] = useState(false)
 
@@ -141,6 +141,13 @@ function ProfileDrawer({ user, isFriend, onClose, onChat, onVideoCall, onAddFrie
                   Nhắn tin
                 </button>
                 <button
+                  onClick={() => { onAudioCall(user); onClose() }}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-surface-container text-on-surface rounded-xl font-semibold hover:bg-surface-container-high transition-all"
+                >
+                  <span className="material-symbols-outlined text-[20px]">call</span>
+                  Gọi thoại
+                </button>
+                <button
                   onClick={() => { onVideoCall(user); onClose() }}
                   className="w-full flex items-center justify-center gap-2 py-3 bg-surface-container text-on-surface rounded-xl font-semibold hover:bg-surface-container-high transition-all"
                 >
@@ -193,7 +200,7 @@ function ProfileDrawer({ user, isFriend, onClose, onChat, onVideoCall, onAddFrie
 }
 
 // ─── Discover / Search Card ───────────────────────────────────────────────────
-function UserCard({ user, isFriend, onAddFriend, onChat, onVideoCall, onViewProfile }) {
+function UserCard({ user, isFriend, onAddFriend, onChat, onVideoCall, onAudioCall, onViewProfile }) {
   const [reqStatus, setReqStatus] = useState('idle')
 
   const handleAdd = async (e) => {
@@ -228,6 +235,13 @@ function UserCard({ user, isFriend, onAddFriend, onChat, onVideoCall, onViewProf
               className="flex-1 bg-primary text-white py-2 rounded-xl text-xs font-bold hover:opacity-90 transition-all"
             >
               Nhắn tin
+            </button>
+            <button
+              onClick={() => onAudioCall(user)}
+              className="px-3 py-2 bg-surface-container text-on-surface-variant rounded-xl hover:bg-surface-container-high transition-colors"
+              aria-label="Gọi thoại"
+            >
+              <span className="material-symbols-outlined text-[18px]">call</span>
             </button>
             <button
               onClick={() => onVideoCall(user)}
@@ -382,6 +396,16 @@ export default function FriendsPage() {
     })
   }
 
+  const handleAudioCall = (friend) => {
+    if (!friend?.id) return
+
+    startOutgoingAudioCall(navigate, {
+      receiverId: friend.id,
+      receiverName: getDisplayName(friend),
+      receiverAvatar: getAvatar(friend),
+    })
+  }
+
   const isSearching = searchTerm.trim().length > 0
   const rightItems = isSearching ? searchResults : discoverList
 
@@ -426,6 +450,7 @@ export default function FriendsPage() {
                   friend={friend}
                   onChat={handleChat}
                   onVideoCall={handleVideoCall}
+                  onAudioCall={handleAudioCall}
                   onViewProfile={() => setSelectedUser({ ...friend, _isFriend: true })}
                 />
               ))
@@ -490,6 +515,7 @@ export default function FriendsPage() {
                     onAddFriend={handleAddFriend}
                     onChat={handleChat}
                     onVideoCall={handleVideoCall}
+                    onAudioCall={handleAudioCall}
                     onViewProfile={(u) => setSelectedUser({ ...u, _isFriend: isFriend(u.id) })}
                   />
                 ))}
@@ -516,6 +542,7 @@ export default function FriendsPage() {
           onClose={() => setSelectedUser(null)}
           onChat={handleChat}
           onVideoCall={handleVideoCall}
+          onAudioCall={handleAudioCall}
           onAddFriend={handleAddFriend}
           onUnfriend={handleUnfriend}
         />
@@ -543,7 +570,7 @@ function TabBtn({ label, active, onClick, badge }) {
   )
 }
 
-function FriendRow({ friend, onChat, onVideoCall, onViewProfile }) {
+function FriendRow({ friend, onChat, onVideoCall, onAudioCall, onViewProfile }) {
   return (
     <div
       className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface-container transition-all cursor-pointer"
@@ -566,6 +593,13 @@ function FriendRow({ friend, onChat, onVideoCall, onViewProfile }) {
           aria-label="Nhắn tin"
         >
           <span className="material-symbols-outlined text-[20px]">chat</span>
+        </button>
+        <button
+          onClick={() => onAudioCall(friend)}
+          className="text-on-surface-variant p-1.5 hover:bg-surface-container-high rounded-full transition-colors"
+          aria-label="Gọi thoại"
+        >
+          <span className="material-symbols-outlined text-[20px]">call</span>
         </button>
         <button
           onClick={() => onVideoCall(friend)}

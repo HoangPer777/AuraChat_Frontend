@@ -4,7 +4,7 @@ import useAuthStore from '../../store/authStore'
 import { clearCallSession, loadCallSession, saveCallSession } from '../../utils/callSession'
 import { publishCallEnd } from '../../services/callService'
 import { startIncomingRing, stopRing } from '../../utils/callRingtone'
-import { getTerminalCallMessage } from '../../utils/callHelpers'
+import { getTerminalCallMessage, getCallRoute } from '../../utils/callHelpers'
 import useCallEndListener from '../../hooks/useCallEndListener'
 
 export default function IncomingCallPage() {
@@ -73,8 +73,10 @@ export default function IncomingCallPage() {
     }
 
     saveCallSession(acceptedCall)
-    navigate('/call/video', { state: acceptedCall })
+    navigate(getCallRoute(acceptedCall.type), { state: acceptedCall })
   }
+
+  const isAudioCall = incomingCall?.type === 'AUDIO'
 
   return (
     <div className="bg-background font-sans text-on-background min-h-screen flex items-center justify-center p-4">
@@ -94,7 +96,7 @@ export default function IncomingCallPage() {
 
           <h3 className="text-white font-bold text-xl mb-1">{callerName}</h3>
           <p className="text-white/50 text-xs font-medium tracking-widest uppercase mb-8">
-            Cuộc gọi video đến
+            {isAudioCall ? 'Cuộc gọi thoại đến' : 'Cuộc gọi video đến'}
           </p>
 
           <div className="flex gap-10 items-center justify-center w-full">
@@ -114,7 +116,7 @@ export default function IncomingCallPage() {
                 onClick={handleAccept}
                 className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center text-white hover:bg-green-600 transition-all hover:scale-110 active:scale-95 shadow-lg shadow-green-500/20"
               >
-                <span className="material-symbols-outlined text-[30px]">videocam</span>
+                <span className="material-symbols-outlined text-[30px]">{isAudioCall ? 'call' : 'videocam'}</span>
               </button>
               <span className="text-white/40 text-[10px] font-bold uppercase tracking-wider">Chấp nhận</span>
             </div>

@@ -30,15 +30,29 @@ export async function getLocalStream(kind = 'VIDEO') {
     throw new Error('Trình duyệt không hỗ trợ camera hoặc microphone.')
   }
 
+  const videoConstraints = {
+    facingMode: 'user',
+    width: { ideal: 640 },
+    height: { ideal: 480 },
+  }
+
   if (kind === 'AUDIO') {
     return navigator.mediaDevices.getUserMedia({ audio: true, video: false })
   }
 
   try {
-    return await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+    return await navigator.mediaDevices.getUserMedia({ audio: true, video: videoConstraints })
   } catch (error) {
     const recoverable = ['NotFoundError', 'NotReadableError', 'OverconstrainedError']
     if (recoverable.includes(error?.name)) {
+      try {
+        return await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: { facingMode: 'user' },
+        })
+      } catch {
+        // fall through to audio-only below
+      }
       try {
         return await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
       } catch (audioError) {
@@ -51,6 +65,22 @@ export async function getLocalStream(kind = 'VIDEO') {
     }
 
     throw error
+  }
+}
+
+export async function attachStreamToVideo(videoEl, stream) {
+  if (!videoEl || !stream) return
+
+  if (videoEl.srcObject !== stream) {
+    videoEl.srcObject = stream
+  }
+
+  try {
+    await videoEl.play()
+  } catch (error) {
+    if (error?.name !== 'AbortError') {
+      console.warn('Video preview play failed:', error)
+    }
   }
 }
 

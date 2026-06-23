@@ -10,7 +10,8 @@ export function isCallRingingAck(message) {
   return Boolean(message?.callId && message?.status === 'RINGING' && !message?.sdp && !message?.candidate)
 }
 
-export function buildOutgoingVideoCallSession({
+export function buildOutgoingCallSession({
+  type = 'VIDEO',
   receiverId,
   receiverName,
   receiverAvatar,
@@ -18,7 +19,7 @@ export function buildOutgoingVideoCallSession({
 }) {
   return {
     mode: 'outgoing',
-    type: 'VIDEO',
+    type,
     conversationId,
     receiverId,
     receiverName,
@@ -26,15 +27,28 @@ export function buildOutgoingVideoCallSession({
   }
 }
 
-export function startOutgoingVideoCall(navigate, params) {
+export function getCallRoute(type = 'VIDEO') {
+  return type === 'AUDIO' ? '/call/audio' : '/call/video'
+}
+
+export function startOutgoingCall(navigate, params) {
   if (!params?.receiverId) {
     return false
   }
 
-  const session = buildOutgoingVideoCallSession(params)
+  const callType = params.type || 'VIDEO'
+  const session = buildOutgoingCallSession({ ...params, type: callType })
   saveCallSession(session)
-  navigate('/call/video', { state: session })
+  navigate(getCallRoute(callType), { state: session })
   return true
+}
+
+export function startOutgoingVideoCall(navigate, params) {
+  return startOutgoingCall(navigate, { ...params, type: 'VIDEO' })
+}
+
+export function startOutgoingAudioCall(navigate, params) {
+  return startOutgoingCall(navigate, { ...params, type: 'AUDIO' })
 }
 
 export function getTerminalCallMessage(status) {

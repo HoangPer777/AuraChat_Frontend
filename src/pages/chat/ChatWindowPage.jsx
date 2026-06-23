@@ -5,8 +5,11 @@ import useChatStore from '../../store/chatStore';
 import useFriendStore from '../../store/friendStore';
 import api from '../../services/api';
 import { createPrivateConversation } from '../../services/friendService';
-import { uploadFile, uploadImage } from '../../services/mediaService';
-import { startOutgoingVideoCall } from '../../utils/callHelpers';
+import { uploadFile, uploadImage, uploadAudio } from '../../services/mediaService';
+import { startOutgoingVideoCall, startOutgoingAudioCall } from '../../utils/callHelpers';
+import OnlineIndicator from '../../components/user/OnlineIndicator';
+import { formatCallLogText } from '../../utils/callLogMessage';
+import useVoiceRecorder from '../../hooks/useVoiceRecorder';
 
 export default function ChatWindowPage() {
   const navigate = useNavigate();
@@ -22,7 +25,18 @@ export default function ChatWindowPage() {
   const imageInputRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  const {
+    isRecording,
+    durationSec,
+    error: voiceError,
+    startRecording,
+    stopRecording,
+    cancelRecording,
+    clearError: clearVoiceError,
+  } = useVoiceRecorder();
+
   const friendId = searchParams.get('friendId') || location.state?.friendId || null;
+  const callNotice = location.state?.callNotice || null;
 
   const getConversationPeerId = (conversation) => {
     if (!conversation) return null;
@@ -38,6 +52,9 @@ export default function ChatWindowPage() {
 
     return null;
   };
+
+  const activePeerId = getConversationPeerId(activeConversation);
+  const peerOnline = useChatStore((state) => Boolean(activePeerId && state.onlineByUserId[activePeerId]));
 
   const findPrivateConversationByFriendId = (conversationList, targetFriendId) =>
     conversationList.find((conversation) => {
@@ -150,26 +167,58 @@ export default function ChatWindowPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    if (!callNotice) return undefined
+
+    if (callNotice === 'busy') {
+      window.alert('Bên kia đang bận hoặc không thể nhận cuộc gọi lúc này.')
+    }
+
+    navigate(location.pathname + location.search, {
+      replace: true,
+      state: {
+        friendId: location.state?.friendId || friendId,
+        callNotice: null,
+      },
+    })
+
+    return undefined
+  }, [callNotice, location.pathname, location.search, location.state, navigate, friendId]);
+
+  useEffect(() => {
+    if (!voiceError) return undefined
+    window.alert(voiceError)
+    clearVoiceError()
+    return undefined
+  }, [voiceError, clearVoiceError]);
+
+  const ensureConversationId = async () => {
+    let conversationId = activeConversation?.id
+    if (!conversationId) return null
+
+    if (conversationId.startsWith('temp_')) {
+      try {
+        const response = await createPrivateConversation(activeConversation.receiverId)
+        if (response?.success && response?.data?.id) {
+          conversationId = response.data.id
+          setActiveConversation(response.data)
+        }
+      } catch (err) {
+        console.error('Failed to create conversation:', err)
+        window.alert('Không thể tạo cuộc trò chuyện. Vui lòng thử lại.')
+        return null
+      }
+    }
+
+    return conversationId
+  }
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
 
-    let conversationId = activeConversation?.id;
-
-    // If conversation is temporary (mock), try to create it first
-    if (conversationId?.startsWith('temp_')) {
-      try {
-        const response = await createPrivateConversation(activeConversation.receiverId);
-        if (response?.success && response?.data?.id) {
-          conversationId = response.data.id;
-          setActiveConversation(response.data);
-        }
-      } catch (err) {
-        console.error('Failed to create conversation:', err);
-        window.alert('Không thể tạo cuộc trò chuyện. Vui lòng thử lại.');
-        return;
-      }
-    }
+    const conversationId = await ensureConversationId();
+    if (!conversationId) return;
 
     try {
       const response = await api.post(`/conversations/${conversationId}/messages`, {
@@ -190,20 +239,8 @@ export default function ChatWindowPage() {
     event.target.value = ''
     if (!file || !activeConversation) return
 
-    let conversationId = activeConversation.id
-    if (conversationId?.startsWith('temp_')) {
-      try {
-        const response = await createPrivateConversation(activeConversation.receiverId)
-        if (response?.success && response?.data?.id) {
-          conversationId = response.data.id
-          setActiveConversation(response.data)
-        }
-      } catch (err) {
-        console.error('Failed to create conversation before attachment upload:', err)
-        window.alert('Khong the tao cuoc tro chuyen de gui tep.')
-        return
-      }
-    }
+    const conversationId = await ensureConversationId()
+    if (!conversationId) return
 
     setUploadingType(mediaType)
     try {
@@ -218,7 +255,7 @@ export default function ChatWindowPage() {
 
       const payload = uploadResponse.data
       const sendPayload = {
-        content: mediaType === 'IMAGE' ? (file.name || 'Image') : `Tep: ${payload.originalFileName || file.name}`,
+        content: mediaType === 'IMAGE' ? '' : `Tep: ${payload.originalFileName || file.name}`,
         type: mediaType,
         fileUrl: payload.url,
         fileName: payload.originalFileName || payload.fileName || file.name,
@@ -237,8 +274,75 @@ export default function ChatWindowPage() {
     }
   }
 
+  const sendVoiceMessage = async (recording) => {
+    if (!activeConversation || !recording?.blob) return
+
+    const conversationId = await ensureConversationId()
+    if (!conversationId) return
+
+    const extension = recording.mimeType.includes('ogg') ? 'ogg' : 'webm'
+    const voiceFile = new File([recording.blob], `voice-${Date.now()}.${extension}`, {
+      type: recording.mimeType,
+    })
+
+    setUploadingType('VOICE')
+    try {
+      const uploadResponse = await uploadAudio(voiceFile)
+      if (!uploadResponse?.success || !uploadResponse?.data?.url) {
+        window.alert(uploadResponse?.message || 'Tải tin nhắn thoại thất bại.')
+        return
+      }
+
+      const payload = uploadResponse.data
+      const messageResponse = await api.post(`/conversations/${conversationId}/messages`, {
+        content: '',
+        type: 'VOICE',
+        fileUrl: payload.url,
+        fileName: payload.originalFileName || payload.fileName || voiceFile.name,
+        fileSize: payload.size || voiceFile.size,
+      })
+
+      if (messageResponse.data?.success) {
+        addMessage(messageResponse.data.data)
+      }
+    } catch (err) {
+      console.error('Error sending voice message:', err)
+      window.alert(err.response?.data?.message || 'Không thể gửi tin nhắn thoại.')
+    } finally {
+      setUploadingType(null)
+    }
+  }
+
+  const handleVoiceToggle = async () => {
+    if (uploadingType) return
+
+    if (isRecording) {
+      try {
+        const recording = await stopRecording()
+        await sendVoiceMessage(recording)
+      } catch (err) {
+        if (err?.message !== 'Bản ghi âm quá ngắn.') {
+          window.alert(err.message || 'Không thể gửi tin nhắn thoại.')
+        }
+        cancelRecording()
+      }
+      return
+    }
+
+    await startRecording()
+  }
+
+  const formatVoiceDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
   const getConversationPeer = (conversation) => {
     if (!conversation) return null;
+
+    const peerId = getConversationPeerId(conversation)
+    if (!peerId) return null
 
     if (conversation.receiverId && conversation.receiverId !== user?.id) {
       return {
@@ -257,16 +361,17 @@ export default function ChatWindowPage() {
       };
     }
 
-    return conversation.type === 'PRIVATE'
-      ? {
-          id: conversation.id,
-          name: conversation.name,
-          avatar: conversation.avatar,
-        }
-      : null;
+    return {
+      id: peerId,
+      name: conversation.name,
+      avatar: conversation.avatar,
+    };
   };
 
-  const startVideoCall = () => {
+  const conversationPeer = getConversationPeer(activeConversation);
+  const canCallPeer = Boolean(conversationPeer?.id && isFriend(conversationPeer.id));
+
+  const startPeerCall = (callType) => {
     if (!activeConversation) return;
 
     const peer = getConversationPeer(activeConversation);
@@ -277,13 +382,23 @@ export default function ChatWindowPage() {
       return
     }
 
-    startOutgoingVideoCall(navigate, {
+    const params = {
       conversationId: activeConversation.id,
       receiverId: peer.id,
       receiverName: peer.name,
       receiverAvatar: peer.avatar,
-    });
+    };
+
+    if (callType === 'AUDIO') {
+      startOutgoingAudioCall(navigate, params);
+      return;
+    }
+
+    startOutgoingVideoCall(navigate, params);
   };
+
+  const startAudioCall = () => startPeerCall('AUDIO');
+  const startVideoCall = () => startPeerCall('VIDEO');
 
   const formatTime = (isoString) => {
     if (!isoString) return '';
@@ -300,33 +415,40 @@ export default function ChatWindowPage() {
             <div className="flex items-center gap-3">
               <div className="relative">
                 <img alt={activeConversation.name} className="w-10 h-10 rounded-full object-cover" src={activeConversation.avatar || "https://ui-avatars.com/api/?name=" + activeConversation.name} />
-                {activeConversation.isOnline && <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>}
+                <OnlineIndicator
+                  userId={activePeerId}
+                  className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"
+                />
               </div>
               <div>
                 <h2 className="font-bold text-on-surface">{activeConversation.name}</h2>
-                <p className={`text-[10px] ${activeConversation.isOnline ? 'text-green-600' : 'text-outline'} flex items-center gap-1`}>
-                  <span className={`w-1.5 h-1.5 ${activeConversation.isOnline ? 'bg-green-500' : 'bg-outline'} rounded-full`}></span>
-                  {activeConversation.isOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
+                <p className={`text-[10px] ${peerOnline ? 'text-green-600' : 'text-outline'} flex items-center gap-1`}>
+                  <span className={`w-1.5 h-1.5 ${peerOnline ? 'bg-green-500' : 'bg-outline'} rounded-full`}></span>
+                  {peerOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-4 text-on-surface-variant">
+            <div className="flex items-center gap-2 text-on-surface-variant">
                 <button
-                  onClick={startVideoCall}
-                  disabled={getConversationPeer(activeConversation)?.id && !isFriend(getConversationPeer(activeConversation).id)}
+                  type="button"
+                  onClick={startAudioCall}
+                  disabled={!canCallPeer}
+                  title="Gọi thoại"
                   className="p-2 hover:bg-surface-container-high rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  aria-label="Video call"
+                  aria-label="Gọi thoại"
                 >
-                <span className="material-symbols-outlined">call</span>
-              </button>
+                  <span className="material-symbols-outlined">call</span>
+                </button>
                 <button
+                  type="button"
                   onClick={startVideoCall}
-                  disabled={getConversationPeer(activeConversation)?.id && !isFriend(getConversationPeer(activeConversation).id)}
+                  disabled={!canCallPeer}
+                  title="Gọi video"
                   className="p-2 hover:bg-surface-container-high rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  aria-label="Video call"
+                  aria-label="Gọi video"
                 >
-                <span className="material-symbols-outlined">videocam</span>
-              </button>
+                  <span className="material-symbols-outlined">videocam</span>
+                </button>
               <button className="p-2 hover:bg-surface-container-high rounded-full transition-colors">
                 <span className="material-symbols-outlined">info</span>
               </button>
@@ -337,6 +459,25 @@ export default function ChatWindowPage() {
           <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-surface-container-lowest/30">
             {messages.map((msg, index) => {
               const isMe = msg.senderId === user?.id;
+              const isCallLog = msg.type === 'CALL_LOG';
+
+              if (isCallLog) {
+                return (
+                  <div key={msg.id || index} className={`flex ${isMe ? 'justify-end' : 'items-end gap-2'} max-w-[85%] ${isMe ? 'ml-auto' : ''}`}>
+                    {!isMe && (
+                      <img alt="Avatar" className="w-8 h-8 rounded-full object-cover flex-shrink-0" src={activeConversation.avatar || "https://ui-avatars.com/api/?name=" + activeConversation.name} />
+                    )}
+                    <div className="bg-surface-container-high text-on-surface-variant px-4 py-2.5 rounded-2xl shadow-sm border border-outline-variant/40">
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="material-symbols-outlined text-base text-primary">call</span>
+                        <span>{formatCallLogText(msg.content)}</span>
+                      </div>
+                      <span className="block text-[10px] text-outline mt-1 text-right">{formatTime(msg.createdAt || msg.sentAt)}</span>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div key={msg.id || index} className={`flex ${isMe ? 'flex-col items-end' : 'items-end gap-2'} max-w-[70%] ${isMe ? 'ml-auto' : ''}`}>
                   {!isMe && (
@@ -344,13 +485,20 @@ export default function ChatWindowPage() {
                   )}
                   <div className={`${isMe ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface'} p-3 rounded-2xl ${isMe ? 'rounded-br-none' : 'rounded-bl-none'} shadow-sm max-w-full`}>
                     {msg.type === 'IMAGE' && msg.fileUrl ? (
-                      <div className="space-y-2">
-                        <img
+                      <img
+                        src={msg.fileUrl}
+                        alt="Hình ảnh"
+                        className="max-h-56 max-w-full rounded-xl object-cover border border-white/10"
+                      />
+                    ) : msg.type === 'VOICE' && msg.fileUrl ? (
+                      <div className="flex items-center gap-2 min-w-[200px]">
+                        <span className="material-symbols-outlined text-base shrink-0">mic</span>
+                        <audio
+                          controls
+                          preload="metadata"
                           src={msg.fileUrl}
-                          alt={msg.fileName || 'Image message'}
-                          className="max-h-56 max-w-full rounded-xl object-cover border border-white/10"
+                          className={`w-full max-w-[220px] h-9 ${isMe ? 'opacity-90' : ''}`}
                         />
-                        {msg.content && <p className="text-sm">{msg.content}</p>}
                       </div>
                     ) : msg.type === 'FILE' && msg.fileUrl ? (
                       <a
@@ -375,13 +523,28 @@ export default function ChatWindowPage() {
 
           {/* INPUT BAR */}
           <footer className="p-4 bg-surface">
+            {isRecording && (
+              <div className="mb-3 flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+                <div className="flex items-center gap-3 text-red-600">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-sm font-medium">Đang ghi âm {formatVoiceDuration(durationSec)}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={cancelRecording}
+                  className="text-sm font-semibold text-red-600 hover:underline"
+                >
+                  Hủy
+                </button>
+              </div>
+            )}
             <form onSubmit={handleSendMessage} className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-2 flex items-center gap-2 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
               <div className="flex items-center gap-1 px-2">
                 <button
                   type="button"
                   className="p-2 text-outline hover:text-primary transition-colors"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingType !== null}
+                  disabled={uploadingType !== null || isRecording}
                 >
                   <span className="material-symbols-outlined">attach_file</span>
                 </button>
@@ -389,7 +552,7 @@ export default function ChatWindowPage() {
                   type="button"
                   className="p-2 text-outline hover:text-primary transition-colors"
                   onClick={() => imageInputRef.current?.click()}
-                  disabled={uploadingType !== null}
+                  disabled={uploadingType !== null || isRecording}
                 >
                   <span className="material-symbols-outlined">image</span>
                 </button>
@@ -410,17 +573,42 @@ export default function ChatWindowPage() {
               </div>
               <input 
                 className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-3" 
-                placeholder={uploadingType ? 'Dang tai media...' : 'Nhập tin nhắn...'} 
+                placeholder={
+                  uploadingType === 'VOICE'
+                    ? 'Đang gửi tin nhắn thoại...'
+                    : uploadingType
+                      ? 'Đang tải media...'
+                      : isRecording
+                        ? 'Nhấn mic lần nữa để gửi...'
+                        : 'Nhập tin nhắn...'
+                } 
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                disabled={uploadingType !== null}
+                disabled={uploadingType !== null || isRecording}
               />
               <div className="flex items-center gap-1 px-2">
-                <button type="button" className="p-2 text-outline hover:text-primary transition-colors">
+                <button
+                  type="button"
+                  onClick={handleVoiceToggle}
+                  disabled={uploadingType !== null}
+                  title={isRecording ? 'Gửi tin nhắn thoại' : 'Ghi âm tin nhắn thoại'}
+                  className={`p-2 rounded-full transition-colors ${
+                    isRecording
+                      ? 'bg-red-500 text-white animate-pulse'
+                      : 'text-outline hover:text-primary hover:bg-primary/10'
+                  }`}
+                >
+                  <span className="material-symbols-outlined">{isRecording ? 'stop' : 'mic'}</span>
+                </button>
+                <button type="button" className="p-2 text-outline hover:text-primary transition-colors" disabled={isRecording}>
                   <span className="material-symbols-outlined">sentiment_satisfied</span>
                 </button>
-                <button type="submit" className="bg-primary w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg hover:opacity-90 active:scale-95 transition-all">
+                <button
+                  type="submit"
+                  disabled={isRecording || uploadingType !== null}
+                  className="bg-primary w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg hover:opacity-90 active:scale-95 transition-all disabled:opacity-40"
+                >
                   <span className="material-symbols-outlined">send</span>
                 </button>
               </div>
