@@ -23,30 +23,9 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="bg-background text-on-background font-sans h-screen overflow-hidden flex">
+    <div className="bg-background text-on-background font-sans h-screen overflow-hidden flex flex-1">
       {/* Background/Backdrop Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Side Rail */}
-        <aside className="z-50 flex flex-col justify-between h-screen bg-surface-container-low border-r border-outline-variant w-[80px] items-center py-4 shrink-0">
-          <div className="flex flex-col items-center w-full gap-4">
-            <button onClick={() => navigate('/chat')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-              <span className="material-symbols-outlined">chat</span>
-            </button>
-            <button onClick={() => navigate('/friends')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-              <span className="material-symbols-outlined">group</span>
-            </button>
-            <button onClick={() => navigate('/notifications')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-              <span className="material-symbols-outlined">notifications</span>
-            </button>
-            <button className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-              <span className="material-symbols-outlined">settings</span>
-            </button>
-          </div>
-          <div className="text-primary border-l-4 border-primary w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-            <span className="material-symbols-outlined">account_circle</span>
-          </div>
-        </aside>
-
         {/* Content Area (Mocking the background) */}
         <div className="flex-1 bg-surface-bright p-8">
            <h1 className="text-2xl font-bold text-outline opacity-20">AuraChat Content Background</h1>

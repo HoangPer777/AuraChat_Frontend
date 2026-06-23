@@ -19,30 +19,8 @@ export default function CreateGroupPage() {
   };
 
   return (
-    <div className="bg-background font-sans text-on-background h-screen overflow-hidden flex relative">
-      {/* Side Rail (Static background representation) */}
-      <aside className="fixed left-0 top-0 h-full w-[80px] flex flex-col items-center py-4 z-50 bg-surface-container-low border-r border-outline-variant shrink-0">
-         <div className="text-primary font-bold text-2xl mb-8">AC</div>
-         <div className="space-y-6">
-            <span className="material-symbols-outlined text-outline opacity-50 block">chat</span>
-            <span className="material-symbols-outlined text-outline opacity-50 block">group</span>
-            <span className="material-symbols-outlined text-outline opacity-50 block">notifications</span>
-         </div>
-      </aside>
-
-      {/* Main Content Area (Blurred Background) */}
-      <main className="ml-[80px] flex-1 flex flex-col blur-[2px] pointer-events-none opacity-50">
-        <header className="h-16 border-b border-outline-variant px-6 flex items-center">
-          <h1 className="text-xl font-bold">Tin nhắn</h1>
-        </header>
-        <div className="flex-1 flex overflow-hidden">
-          <aside className="w-[320px] border-r border-outline-variant"></aside>
-          <div className="flex-1 bg-surface-bright"></div>
-        </div>
-      </main>
-
-      {/* Modal Overlay */}
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
+    <div className="flex-1 h-screen bg-surface-bright relative">
+      <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
         <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
           {/* Modal Header */}
           <header className="px-6 py-4 border-b border-outline-variant flex justify-between items-center bg-white sticky top-0 z-10">

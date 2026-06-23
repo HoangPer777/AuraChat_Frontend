@@ -1,8 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import useAuthStore from '../../store/authStore';
 import useFriendStore from '../../store/friendStore';
-import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications';
 
 const staticNotifications = [
   { id: 'message-1', type: 'MESSAGE', sender: 'Nguyễn Minh Tú', time: '15 phút trước', read: true, avatar: 'https://i.pravatar.cc/150?u=tu', message: 'đã gửi tin nhắn cho bạn' },
@@ -25,12 +22,8 @@ const formatTimeAgo = (value) => {
 }
 
 export default function NotificationsPage() {
-  const navigate = useNavigate();
-  const { user } = useAuthStore();
   const [filter, setFilter] = useState('all');
   const { pendingRequests, loadPendingRequests, acceptRequest, declineRequest } = useFriendStore();
-
-  useFriendRequestNotifications();
 
   useEffect(() => {
     loadPendingRequests().catch(() => {})
@@ -54,30 +47,7 @@ export default function NotificationsPage() {
   const filteredNotifs = filter === 'all' ? notifications : notifications.filter(n => n.type === filter.toUpperCase());
 
   return (
-    <div className="bg-surface-bright text-on-surface h-screen overflow-hidden flex font-sans">
-      {/* SIDE RAIL */}
-      <aside className="z-50 flex flex-col justify-between h-screen bg-surface-container-low border-r border-outline-variant w-[80px] items-center py-4 shrink-0">
-        <div className="flex flex-col items-center w-full gap-4">
-          <button onClick={() => navigate('/chat')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-            <span className="material-symbols-outlined">chat</span>
-          </button>
-          <button onClick={() => navigate('/friends')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-            <span className="material-symbols-outlined">group</span>
-          </button>
-          <button className="text-primary border-l-4 border-primary w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-            <span className="material-symbols-outlined">notifications</span>
-          </button>
-          <button className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-            <span className="material-symbols-outlined">settings</span>
-          </button>
-        </div>
-        <div className="w-full flex flex-col items-center pb-4">
-          <button onClick={() => navigate('/profile')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors rounded-full overflow-hidden">
-            <img alt="User" className="w-10 h-10 rounded-full border-2 border-outline-variant object-cover" src={user?.avatar || "https://ui-avatars.com/api/?name=" + (user?.displayName || "User")} />
-          </button>
-        </div>
-      </aside>
-
+    <div className="bg-surface-bright text-on-surface h-screen overflow-hidden flex flex-1 font-sans">
       {/* NOTIFICATIONS SIDEBAR */}
       <div className="w-[320px] h-screen bg-surface-container-lowest border-r border-outline-variant flex flex-col shrink-0">
         <header className="p-4 border-b border-outline-variant">

@@ -1,4 +1,5 @@
 import { Client } from '@stomp/stompjs'
+import SockJS from 'sockjs-client'
 
 /**
  * WebSocket Service with STOMP client
@@ -41,9 +42,18 @@ export async function connect(onConnected, onDisconnected, onError) {
 
     setConnectionState('connecting')
 
+    const isSecure = window.location.protocol === 'https:'
+    const wsProtocol = isSecure ? 'wss' : 'ws'
+    const httpProtocol = isSecure ? 'https' : 'http'
+    const wsBase = `${wsProtocol}://${window.location.host}/ws`
+    const sockJsBase = `${httpProtocol}://${window.location.host}/ws`
+    const configuredWsUrl = import.meta.env.VITE_WS_URL
+
     stompClient = new Client({
-      // Tự động dùng wss:// khi trang chạy HTTPS, ws:// khi HTTP
-      brokerURL: `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`,
+      // Ưu tiên URL cấu hình nếu có; fallback về same-origin
+      brokerURL: configuredWsUrl || wsBase,
+      // SockJS fallback để tăng tương thích production qua reverse proxy/CDN
+      webSocketFactory: () => new SockJS(sockJsBase),
       connectHeaders: {
         Authorization: `Bearer ${accessToken}`,
       },

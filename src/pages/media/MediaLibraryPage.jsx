@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import useAuthStore from '../../store/authStore'
 import { deleteMedia, getMediaDetail, listMedia, uploadFile, uploadImage } from '../../services/mediaService'
 import PrimaryButton from '../../components/buttons/PrimaryButton'
 import SecondaryButton from '../../components/buttons/SecondaryButton'
@@ -26,8 +24,6 @@ const formatBytes = (bytes) => {
 }
 
 export default function MediaLibraryPage() {
-  const navigate = useNavigate()
-  const { user } = useAuthStore()
   const [mode, setMode] = useState('image')
   const [selectedFile, setSelectedFile] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
@@ -173,31 +169,7 @@ export default function MediaLibraryPage() {
   }
 
   return (
-    <div className="bg-surface-bright text-on-surface h-screen overflow-hidden flex font-sans">
-      <aside className="z-30 flex flex-col justify-between h-screen bg-surface-container-low border-r border-outline-variant w-[80px] items-center py-4 shrink-0">
-        <div className="flex flex-col items-center w-full gap-1">
-          <button onClick={() => navigate('/chat')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-            <span className="material-symbols-outlined">chat</span>
-          </button>
-          <button onClick={() => navigate('/friends')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-            <span className="material-symbols-outlined">group</span>
-          </button>
-          <button onClick={() => navigate('/notifications')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-            <span className="material-symbols-outlined">notifications</span>
-          </button>
-          <button className="text-primary border-l-4 border-primary w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-            <span className="material-symbols-outlined">perm_media</span>
-          </button>
-        </div>
-        <button onClick={() => navigate('/profile')} className="mb-2">
-          <img
-            src={user?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || 'User')}`}
-            alt="me"
-            className="w-10 h-10 rounded-full object-cover border-2 border-outline-variant"
-          />
-        </button>
-      </aside>
-
+    <div className="bg-surface-bright text-on-surface h-screen overflow-hidden flex flex-1 font-sans">
       <main className="flex-1 h-screen overflow-y-auto px-8 py-8">
         <header className="mb-6">
           <h1 className="text-2xl font-bold">Thu vien media</h1>

@@ -6,9 +6,6 @@ import useFriendStore from '../../store/friendStore';
 import api from '../../services/api';
 import { createPrivateConversation } from '../../services/friendService';
 import { uploadFile, uploadImage } from '../../services/mediaService';
-import useIncomingCallNotifications from '../../hooks/useIncomingCallNotifications';
-import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications';
-import useChatWebSocket from '../../hooks/useChatWebSocket';
 import { saveCallSession } from '../../utils/callSession';
 
 export default function ChatWindowPage() {
@@ -53,10 +50,6 @@ export default function ChatWindowPage() {
 
       return conversation.id === targetFriendId;
     }) || null;
-
-  useIncomingCallNotifications();
-  useFriendRequestNotifications();
-  useChatWebSocket();
 
   useEffect(() => {
     if (friends.length === 0) {
@@ -305,39 +298,8 @@ export default function ChatWindowPage() {
   if (!activeConversation) return null;
 
   return (
-    <div className="bg-surface font-sans text-on-surface overflow-hidden h-screen flex">
-      {/* SIDEBAR NAVIGATION (Rail) */}
-      <aside className="z-50 flex flex-col justify-between h-screen bg-surface-container-low border-r border-outline-variant fixed left-0 top-0 w-[80px] py-4 items-center">
-        <div className="flex flex-col items-center gap-8 w-full">
-          <div onClick={() => navigate('/chat')} className="text-primary cursor-pointer">
-            <span className="material-symbols-outlined text-4xl">bubble_chart</span>
-          </div>
-          <nav className="flex flex-col items-center w-full">
-            <button onClick={() => navigate('/chat')} className="text-primary border-l-4 border-primary w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-              <span className="material-symbols-outlined">chat</span>
-            </button>
-            <button onClick={() => navigate('/friends')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-              <span className="material-symbols-outlined">group</span>
-            </button>
-            <button onClick={() => navigate('/notifications')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-              <span className="material-symbols-outlined">notifications</span>
-            </button>
-            <button className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-              <span className="material-symbols-outlined">settings</span>
-            </button>
-          </nav>
-        </div>
-        <div className="flex flex-col items-center w-full">
-          <button onClick={() => navigate('/profile')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-             <img alt="User" className="w-10 h-10 rounded-full border-2 border-outline-variant object-cover" src={user?.avatar || "https://ui-avatars.com/api/?name=" + (user?.displayName || "User")} />
-          </button>
-        </div>
-      </aside>
-
-      {/* MAIN CONTENT */}
-      <main className="ml-[80px] flex w-full h-full">
-        {/* CHAT WINDOW */}
-        <section className="flex-1 flex flex-col bg-surface overflow-hidden">
+    <div className="bg-surface font-sans text-on-surface overflow-hidden h-screen flex flex-1">
+      <section className="flex-1 flex flex-col bg-surface overflow-hidden">
           {/* HEADER */}
           <header className="h-16 flex justify-between items-center px-4 border-b border-outline-variant bg-surface/80 backdrop-blur-md z-10">
             <div className="flex items-center gap-3">
@@ -470,7 +432,6 @@ export default function ChatWindowPage() {
             </form>
           </footer>
         </section>
-      </main>
     </div>
   );
 }

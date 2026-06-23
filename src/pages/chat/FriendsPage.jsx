@@ -4,7 +4,6 @@ import useAuthStore from '../../store/authStore'
 import useFriendStore from '../../store/friendStore'
 import usePresenceStore from '../../store/presenceStore'
 import { searchUsers, discoverUsers } from '../../services/friendService'
-import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications'
 import { saveCallSession } from '../../utils/callSession'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -291,8 +290,6 @@ export default function FriendsPage() {
   // Profile drawer
   const [selectedUser, setSelectedUser] = useState(null)
 
-  useFriendRequestNotifications()
-
   useEffect(() => {
     loadFriends().catch(() => {})
     loadPendingRequests().catch(() => {})
@@ -394,24 +391,7 @@ export default function FriendsPage() {
   const rightItems = isSearching ? searchResults : discoverList
 
   return (
-    <div className="bg-surface-bright text-on-surface h-screen overflow-hidden flex font-sans">
-
-      {/* ── Icon sidebar ── */}
-      <aside className="z-30 flex flex-col justify-between h-screen bg-surface-container-low border-r border-outline-variant w-[80px] items-center py-4 shrink-0">
-        <div className="flex flex-col items-center w-full gap-1">
-          <NavBtn icon="chat" label="Chat" onClick={() => navigate('/chat')} />
-          <NavBtn icon="group" label="Bạn bè" active />
-          <NavBtn icon="notifications" label="Thông báo" onClick={() => navigate('/notifications')} />
-          <NavBtn icon="settings" label="Cài đặt" />
-        </div>
-        <button onClick={() => navigate('/profile')} className="mb-2">
-          <img
-            src={getAvatar(user)}
-            alt="me"
-            className="w-10 h-10 rounded-full object-cover border-2 border-outline-variant"
-          />
-        </button>
-      </aside>
+    <div className="bg-surface-bright text-on-surface h-screen overflow-hidden flex flex-1 font-sans">
 
       {/* ── Left panel ── */}
       <div className="w-[300px] h-screen bg-surface-container-lowest border-r border-outline-variant flex flex-col shrink-0">
@@ -550,22 +530,6 @@ export default function FriendsPage() {
 }
 
 // ─── Small sub-components ─────────────────────────────────────────────────────
-function NavBtn({ icon, label, active, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      title={label}
-      className={`w-full flex justify-center py-4 transition-colors ${
-        active
-          ? 'text-primary border-l-4 border-primary bg-primary/5'
-          : 'text-on-surface-variant hover:bg-surface-container-high border-l-4 border-transparent'
-      }`}
-    >
-      <span className="material-symbols-outlined">{icon}</span>
-    </button>
-  )
-}
-
 function TabBtn({ label, active, onClick, badge }) {
   return (
     <button

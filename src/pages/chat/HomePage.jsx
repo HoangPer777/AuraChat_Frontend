@@ -3,18 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 import useChatStore from '../../store/chatStore';
 import api from '../../services/api';
-import useIncomingCallNotifications from '../../hooks/useIncomingCallNotifications';
-import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications';
-import useChatWebSocket from '../../hooks/useChatWebSocket';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { conversations, setConversations, setActiveConversation, isOnline } = useChatStore();
-
-  useIncomingCallNotifications();
-  useFriendRequestNotifications();
-  useChatWebSocket();
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -76,40 +69,9 @@ export default function HomePage() {
   };
 
   return (
-    <div className="bg-surface-container-low text-on-surface h-screen overflow-hidden flex">
-      {/* SIDE RAIL NAVIGATION */}
-      <aside className="z-50 flex flex-col justify-between h-screen overflow-y-auto bg-surface-container-low fixed left-0 top-0 h-full w-[80px] items-center py-4 border-r border-outline-variant">
-        <div className="flex flex-col items-center w-full space-y-8">
-          <div className="p-2">
-            <span className="material-symbols-outlined text-primary text-[32px]">waves</span>
-          </div>
-          <nav className="flex flex-col items-center w-full gap-4">
-            <button className="text-primary border-l-4 border-primary w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-              <span className="material-symbols-outlined">chat</span>
-            </button>
-            <button onClick={() => navigate('/friends')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-              <span className="material-symbols-outlined">group</span>
-            </button>
-            <div className="relative w-full flex justify-center">
-              <button onClick={() => navigate('/notifications')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-                <span className="material-symbols-outlined">notifications</span>
-              </button>
-              <span className="absolute top-3 right-5 bg-error text-white text-[10px] px-1.5 py-0.5 rounded-full border-2 border-surface-container-low">5</span>
-            </div>
-            <button className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
-              <span className="material-symbols-outlined">settings</span>
-            </button>
-          </nav>
-        </div>
-        <div className="w-full flex flex-col items-center pb-4">
-          <button onClick={() => navigate('/profile')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors rounded-full overflow-hidden">
-            <img alt="User Profile" className="w-10 h-10 rounded-full border-2 border-outline-variant object-cover" src={user?.avatar || "https://ui-avatars.com/api/?name=" + (user?.displayName || "User")} />
-          </button>
-        </div>
-      </aside>
-
+    <div className="h-screen overflow-hidden flex flex-1">
       {/* CONVERSATION LIST */}
-      <main className="ml-[80px] w-[320px] h-screen bg-surface-container-lowest border-r border-outline-variant flex flex-col shrink-0">
+      <main className="w-[320px] h-screen bg-surface-container-lowest border-r border-outline-variant flex flex-col shrink-0">
         <header className="p-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-on-surface">Tin nhắn</h1>
           <button onClick={() => navigate('/create-group')} className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container-high text-primary hover:bg-primary-container hover:text-white transition-all">
@@ -172,10 +134,6 @@ export default function HomePage() {
               Bắt đầu hội thoại mới
             </button>
           </div>
-        </div>
-        <div className="absolute bottom-6 right-6 flex items-center gap-2 bg-surface-container-high px-3 py-1.5 rounded-full shadow-sm">
-          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-          <span className="text-[12px] text-on-surface-variant">Hệ thống đang hoạt động</span>
         </div>
       </section>
     </div>
