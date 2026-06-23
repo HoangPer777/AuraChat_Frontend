@@ -7,7 +7,7 @@ import api from '../../services/api';
 import { createPrivateConversation } from '../../services/friendService';
 import { getConversation } from '../../services/conversationService';
 import { uploadFile, uploadImage, uploadAudio } from '../../services/mediaService';
-import { startOutgoingVideoCall, startOutgoingAudioCall } from '../../utils/callHelpers';
+import { startOutgoingVideoCall, startOutgoingAudioCall, startOutgoingGroupVideoCall, startOutgoingGroupAudioCall } from '../../utils/callHelpers';
 import OnlineIndicator from '../../components/user/OnlineIndicator';
 import { formatCallLogText } from '../../utils/callLogMessage';
 import useVoiceRecorder from '../../hooks/useVoiceRecorder';
@@ -467,6 +467,24 @@ export default function ChatWindowPage() {
     startOutgoingVideoCall(navigate, params);
   };
 
+  const startGroupCall = (callType) => {
+    if (!activeConversation?.id) return
+
+    const params = {
+      conversationId: activeConversation.id,
+      groupName: conversationTitle,
+      groupAvatar: conversationAvatar,
+      type: callType,
+    }
+
+    if (callType === 'AUDIO') {
+      startOutgoingGroupAudioCall(navigate, params)
+      return
+    }
+
+    startOutgoingGroupVideoCall(navigate, params)
+  }
+
   const startAudioCall = () => startPeerCall('AUDIO');
   const startVideoCall = () => startPeerCall('VIDEO');
 
@@ -500,6 +518,10 @@ export default function ChatWindowPage() {
           onClose={() => setShowGroupInfo(false)}
           onConversationUpdate={handleGroupConversationUpdate}
           onLeave={handleGroupLeave}
+          onStartGroupCall={(callType) => {
+            setShowGroupInfo(false)
+            startGroupCall(callType)
+          }}
         />
       )}
       <section className="flex-1 flex flex-col bg-surface overflow-hidden">
@@ -531,7 +553,28 @@ export default function ChatWindowPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 text-on-surface-variant">
-                {!isGroupChat && (
+                {isGroupChat ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => startGroupCall('AUDIO')}
+                      title="Gọi thoại nhóm"
+                      className="p-2 hover:bg-surface-container-high rounded-full transition-colors"
+                      aria-label="Gọi thoại nhóm"
+                    >
+                      <span className="material-symbols-outlined">call</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => startGroupCall('VIDEO')}
+                      title="Gọi video nhóm"
+                      className="p-2 hover:bg-surface-container-high rounded-full transition-colors"
+                      aria-label="Gọi video nhóm"
+                    >
+                      <span className="material-symbols-outlined">videocam</span>
+                    </button>
+                  </>
+                ) : (
                   <>
                     <button
                       type="button"

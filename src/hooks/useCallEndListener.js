@@ -19,7 +19,7 @@ export default function useCallEndListener(callId, onEnded) {
 
         removeListener = subscribe('/user/queue/call', (message) => {
           if (!active || !message?.callId || message.callId !== callId) return
-          if (isTerminalCallStatus(message)) {
+          if (isTerminalCallStatus(message) || message?.signalType === 'GROUP_END') {
             onEnded(message)
           }
         })

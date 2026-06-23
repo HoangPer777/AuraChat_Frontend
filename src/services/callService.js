@@ -100,3 +100,31 @@ export function publishCallEnd({ callId, status = null }) {
   const payload = status ? { callId, status } : { callId }
   return send('/app/call/end', payload)
 }
+
+export function publishGroupCallOffer(payload) {
+  return send('/app/call/group/offer', payload)
+}
+
+export function publishGroupCallJoin(callId) {
+  return send('/app/call/group/join', { callId })
+}
+
+export function publishGroupPeerOffer({ callId, targetUserId, sdp }) {
+  return send('/app/call/group/peer-offer', { callId, targetUserId, sdp })
+}
+
+export function publishGroupPeerAnswer({ callId, targetUserId, sdp }) {
+  return send('/app/call/group/peer-answer', { callId, targetUserId, sdp })
+}
+
+export function publishGroupCallLeave(callId) {
+  return send('/app/call/group/leave', { callId })
+}
+
+export function publishGroupCallEnd(callId) {
+  return send('/app/call/group/end', { callId })
+}
+
+export function publishGroupCallDecline(callId) {
+  return send('/app/call/group/decline', { callId })
+}

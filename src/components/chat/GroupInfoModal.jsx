@@ -16,6 +16,7 @@ export default function GroupInfoModal({
   onClose,
   onConversationUpdate,
   onLeave,
+  onStartGroupCall,
 }) {
   const avatarInputRef = useRef(null);
   const [groupName, setGroupName] = useState('');
@@ -327,6 +328,25 @@ export default function GroupInfoModal({
               <span>{error}</span>
             </div>
           )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => onStartGroupCall?.('AUDIO')}
+              className="py-3 rounded-xl border border-primary text-primary font-bold text-sm hover:bg-primary/10 transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[20px]">call</span>
+              Gọi thoại nhóm
+            </button>
+            <button
+              type="button"
+              onClick={() => onStartGroupCall?.('VIDEO')}
+              className="py-3 rounded-xl bg-primary text-white font-bold text-sm hover:opacity-90 transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[20px]">videocam</span>
+              Gọi video nhóm
+            </button>
+          </div>
         </div>
 
         <footer className="px-5 py-4 border-t border-outline-variant shrink-0">

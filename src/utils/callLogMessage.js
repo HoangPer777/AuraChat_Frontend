@@ -30,19 +30,25 @@ export function formatCallLogText(content) {
     return content || 'Cuộc gọi'
   }
 
-  const typeLabel = data.callType === 'AUDIO' ? 'Cuộc gọi thoại' : 'Cuộc gọi video'
+  const typeLabel = data.groupCall
+    ? (data.callType === 'AUDIO' ? 'Cuộc gọi thoại nhóm' : 'Cuộc gọi video nhóm')
+    : (data.callType === 'AUDIO' ? 'Cuộc gọi thoại' : 'Cuộc gọi video')
+
+  const participantSuffix = data.groupCall && data.participantCount > 0
+    ? ` · ${data.participantCount} người tham gia`
+    : ''
 
   switch (data.status) {
     case 'COMPLETED': {
       const duration = formatDuration(data.durationSeconds)
-      return duration ? `${typeLabel} · ${duration}` : typeLabel
+      return duration ? `${typeLabel}${participantSuffix} · ${duration}` : `${typeLabel}${participantSuffix}`
     }
     case 'MISSED':
-      return `${typeLabel} · Không trả lời`
+      return `${typeLabel}${participantSuffix} · Không trả lời`
     case 'DECLINED':
-      return `${typeLabel} · Không kết nối được`
+      return `${typeLabel}${participantSuffix} · Không kết nối được`
     default:
-      return typeLabel
+      return `${typeLabel}${participantSuffix}`
   }
 }
 

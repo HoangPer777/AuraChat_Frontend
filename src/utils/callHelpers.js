@@ -27,8 +27,55 @@ export function buildOutgoingCallSession({
   }
 }
 
-export function getCallRoute(type = 'VIDEO') {
+export function getCallRoute(type = 'VIDEO', isGroup = false) {
+  if (isGroup) {
+    return type === 'AUDIO' ? '/call/group/audio' : '/call/group/video'
+  }
   return type === 'AUDIO' ? '/call/audio' : '/call/video'
+}
+
+export function buildOutgoingGroupCallSession({
+  type = 'VIDEO',
+  conversationId,
+  groupName,
+  groupAvatar = null,
+}) {
+  return {
+    mode: 'group-host',
+    type,
+    conversationId,
+    groupName,
+    groupAvatar,
+  }
+}
+
+export function startOutgoingGroupCall(navigate, params) {
+  if (!params?.conversationId) return false
+
+  const callType = params.type || 'VIDEO'
+  const session = buildOutgoingGroupCallSession({ ...params, type: callType })
+  saveCallSession(session)
+  navigate(getCallRoute(callType, true), { state: session })
+  return true
+}
+
+export function startOutgoingGroupVideoCall(navigate, params) {
+  return startOutgoingGroupCall(navigate, { ...params, type: 'VIDEO' })
+}
+
+export function startOutgoingGroupAudioCall(navigate, params) {
+  return startOutgoingGroupCall(navigate, { ...params, type: 'AUDIO' })
+}
+
+export function isGroupCallSignal(message) {
+  return Boolean(
+    message?.signalType?.startsWith('GROUP_')
+    || message?.signalType === 'GROUP_END'
+  )
+}
+
+export function isGroupCallInvite(message) {
+  return message?.signalType === 'GROUP_INVITE'
 }
 
 export function startOutgoingCall(navigate, params) {

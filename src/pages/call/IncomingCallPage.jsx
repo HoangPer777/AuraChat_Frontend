@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
 import { clearCallSession, loadCallSession, saveCallSession } from '../../utils/callSession'
-import { publishCallEnd } from '../../services/callService'
+import { publishCallEnd, publishGroupCallDecline } from '../../services/callService'
 import { startIncomingRing, stopRing } from '../../utils/callRingtone'
 import { getTerminalCallMessage, getCallRoute } from '../../utils/callHelpers'
 import useCallEndListener from '../../hooks/useCallEndListener'
@@ -48,15 +48,24 @@ export default function IncomingCallPage() {
     )
   }
 
-  const callerName = incomingCall.callerName || incomingCall.senderName || 'Cuộc gọi đến'
-  const callerAvatar = incomingCall.callerAvatar || incomingCall.senderAvatar
-    || `https://ui-avatars.com/api/?name=${encodeURIComponent(callerName)}`
+  const isGroupCall = incomingCall?.isGroupCall || incomingCall?.signalType === 'GROUP_INVITE'
+  const callerName = isGroupCall
+    ? (incomingCall.groupName || 'Cuộc gọi nhóm')
+    : (incomingCall.callerName || incomingCall.senderName || 'Cuộc gọi đến')
+  const callerAvatar = isGroupCall
+    ? (incomingCall.groupAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(callerName)}&background=6366f1&color=fff`)
+    : (incomingCall.callerAvatar || incomingCall.senderAvatar
+      || `https://ui-avatars.com/api/?name=${encodeURIComponent(callerName)}`)
 
   const handleDecline = async () => {
     stopRing()
     try {
       if (incomingCall.callId) {
-        await publishCallEnd({ callId: incomingCall.callId, status: 'DECLINED' })
+        if (isGroupCall) {
+          await publishGroupCallDecline(incomingCall.callId)
+        } else {
+          await publishCallEnd({ callId: incomingCall.callId, status: 'DECLINED' })
+        }
       }
     } finally {
       clearCallSession()
@@ -66,6 +75,20 @@ export default function IncomingCallPage() {
 
   const handleAccept = () => {
     stopRing()
+
+    if (isGroupCall) {
+      const acceptedCall = {
+        mode: 'group-incoming',
+        callId: incomingCall.callId,
+        conversationId: incomingCall.conversationId,
+        groupName: incomingCall.groupName,
+        type: incomingCall.type || 'VIDEO',
+      }
+      saveCallSession(acceptedCall)
+      navigate(getCallRoute(acceptedCall.type, true), { state: acceptedCall })
+      return
+    }
+
     const acceptedCall = {
       ...incomingCall,
       mode: 'incoming',
@@ -96,7 +119,9 @@ export default function IncomingCallPage() {
 
           <h3 className="text-white font-bold text-xl mb-1">{callerName}</h3>
           <p className="text-white/50 text-xs font-medium tracking-widest uppercase mb-8">
-            {isAudioCall ? 'Cuộc gọi thoại đến' : 'Cuộc gọi video đến'}
+            {isGroupCall
+              ? (isAudioCall ? 'Cuộc gọi thoại nhóm' : 'Cuộc gọi video nhóm')
+              : (isAudioCall ? 'Cuộc gọi thoại đến' : 'Cuộc gọi video đến')}
           </p>
 
           <div className="flex gap-10 items-center justify-center w-full">

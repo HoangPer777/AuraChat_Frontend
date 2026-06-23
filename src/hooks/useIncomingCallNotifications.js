@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { connect, isConnected, subscribe } from '../services/websocket'
 import useAuthStore from '../store/authStore'
 import { saveCallSession } from '../utils/callSession'
+import { isGroupCallInvite, getCallRoute } from '../utils/callHelpers'
 
 function isIncomingCallOffer(message) {
   return Boolean(
@@ -33,7 +34,22 @@ export default function useIncomingCallNotifications() {
         if (!active || !isConnected()) return
 
         removeListener = subscribe('/user/queue/call', (message) => {
-          if (!active || !isIncomingCallOffer(message)) return
+          if (!active) return
+
+          if (isGroupCallInvite(message)) {
+            saveCallSession({
+              mode: 'group-incoming',
+              callId: message.callId,
+              callerId: message.callerId,
+              conversationId: message.conversationId,
+              groupName: message.groupName,
+              type: message.type || 'VIDEO',
+            })
+            navigateRef.current('/call/incoming', { state: { ...message, isGroupCall: true } })
+            return
+          }
+
+          if (!isIncomingCallOffer(message)) return
           if (message.receiverId && message.receiverId !== user.id) return
 
           saveCallSession({
