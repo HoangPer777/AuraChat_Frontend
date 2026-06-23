@@ -5,6 +5,7 @@ import useChatStore from '../../store/chatStore';
 import useFriendStore from '../../store/friendStore';
 import api from '../../services/api';
 import { createPrivateConversation } from '../../services/friendService';
+import { uploadFile, uploadImage } from '../../services/mediaService';
 import useIncomingCallNotifications from '../../hooks/useIncomingCallNotifications';
 import useFriendRequestNotifications from '../../hooks/useFriendRequestNotifications';
 import useChatWebSocket from '../../hooks/useChatWebSocket';
@@ -18,8 +19,11 @@ export default function ChatWindowPage() {
   const { conversations, setConversations, activeConversation, setActiveConversation, messages, setMessages, addMessage } = useChatStore();
   const { friends, loadFriends, isFriend } = useFriendStore();
   const [newMessage, setNewMessage] = useState('');
+  const [uploadingType, setUploadingType] = useState(null);
   const [isResolvingConversation, setIsResolvingConversation] = useState(true);
   const messagesEndRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const friendId = searchParams.get('friendId') || location.state?.friendId || null;
 
@@ -145,7 +149,7 @@ export default function ChatWindowPage() {
 
   useEffect(() => {
     if (!isResolvingConversation && !activeConversation) {
-      navigate('/test-ui/home');
+      navigate('/chat');
     }
   }, [activeConversation, isResolvingConversation, navigate]);
 
@@ -187,6 +191,58 @@ export default function ChatWindowPage() {
       console.error('Error sending message:', err);
     }
   };
+
+  const handleAttachMedia = async (event, mediaType) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !activeConversation) return
+
+    let conversationId = activeConversation.id
+    if (conversationId?.startsWith('temp_')) {
+      try {
+        const response = await createPrivateConversation(activeConversation.receiverId)
+        if (response?.success && response?.data?.id) {
+          conversationId = response.data.id
+          setActiveConversation(response.data)
+        }
+      } catch (err) {
+        console.error('Failed to create conversation before attachment upload:', err)
+        window.alert('Khong the tao cuoc tro chuyen de gui tep.')
+        return
+      }
+    }
+
+    setUploadingType(mediaType)
+    try {
+      const uploadResponse = mediaType === 'IMAGE'
+        ? await uploadImage(file)
+        : await uploadFile(file)
+
+      if (!uploadResponse?.success || !uploadResponse?.data?.url) {
+        window.alert(uploadResponse?.message || 'Tai media that bai.')
+        return
+      }
+
+      const payload = uploadResponse.data
+      const sendPayload = {
+        content: mediaType === 'IMAGE' ? (file.name || 'Image') : `Tep: ${payload.originalFileName || file.name}`,
+        type: mediaType,
+        fileUrl: payload.url,
+        fileName: payload.originalFileName || payload.fileName || file.name,
+        fileSize: payload.size || file.size,
+      }
+
+      const messageResponse = await api.post(`/conversations/${conversationId}/messages`, sendPayload)
+      if (messageResponse.data?.success) {
+        addMessage(messageResponse.data.data)
+      }
+    } catch (err) {
+      console.error('Error uploading/sending media message:', err)
+      window.alert(err.response?.data?.message || 'Khong the gui media. Vui long thu lai.')
+    } finally {
+      setUploadingType(null)
+    }
+  }
 
   const getConversationPeer = (conversation) => {
     if (!conversation) return null;
@@ -238,7 +294,7 @@ export default function ChatWindowPage() {
     };
 
     saveCallSession(callSession);
-    navigate('/test-ui/video-call', { state: callSession });
+    navigate('/call/video', { state: callSession });
   };
 
   const formatTime = (isoString) => {
@@ -253,17 +309,17 @@ export default function ChatWindowPage() {
       {/* SIDEBAR NAVIGATION (Rail) */}
       <aside className="z-50 flex flex-col justify-between h-screen bg-surface-container-low border-r border-outline-variant fixed left-0 top-0 w-[80px] py-4 items-center">
         <div className="flex flex-col items-center gap-8 w-full">
-          <div onClick={() => navigate('/test-ui/home')} className="text-primary cursor-pointer">
+          <div onClick={() => navigate('/chat')} className="text-primary cursor-pointer">
             <span className="material-symbols-outlined text-4xl">bubble_chart</span>
           </div>
           <nav className="flex flex-col items-center w-full">
-            <button onClick={() => navigate('/test-ui/home')} className="text-primary border-l-4 border-primary w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
+            <button onClick={() => navigate('/chat')} className="text-primary border-l-4 border-primary w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
               <span className="material-symbols-outlined">chat</span>
             </button>
-            <button onClick={() => navigate('/test-ui/friends')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
+            <button onClick={() => navigate('/friends')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
               <span className="material-symbols-outlined">group</span>
             </button>
-            <button onClick={() => navigate('/test-ui/notifications')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
+            <button onClick={() => navigate('/notifications')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
               <span className="material-symbols-outlined">notifications</span>
             </button>
             <button className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
@@ -272,7 +328,7 @@ export default function ChatWindowPage() {
           </nav>
         </div>
         <div className="flex flex-col items-center w-full">
-          <button onClick={() => navigate('/test-ui/profile-new')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
+          <button onClick={() => navigate('/profile')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
              <img alt="User" className="w-10 h-10 rounded-full border-2 border-outline-variant object-cover" src={user?.avatar || "https://ui-avatars.com/api/?name=" + (user?.displayName || "User")} />
           </button>
         </div>
@@ -329,9 +385,30 @@ export default function ChatWindowPage() {
                   {!isMe && (
                     <img alt="Avatar" className="w-8 h-8 rounded-full object-cover flex-shrink-0" src={activeConversation.avatar || "https://ui-avatars.com/api/?name=" + activeConversation.name} />
                   )}
-                  <div className={`${isMe ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface'} p-3 rounded-2xl ${isMe ? 'rounded-br-none' : 'rounded-bl-none'} shadow-sm`}>
-                    {msg.content}
-                    <span className={`block text-[10px] ${isMe ? 'text-white/70' : 'text-outline'} mt-1 text-right`}>{formatTime(msg.createdAt)}</span>
+                  <div className={`${isMe ? 'bg-primary text-white' : 'bg-surface-container-high text-on-surface'} p-3 rounded-2xl ${isMe ? 'rounded-br-none' : 'rounded-bl-none'} shadow-sm max-w-full`}>
+                    {msg.type === 'IMAGE' && msg.fileUrl ? (
+                      <div className="space-y-2">
+                        <img
+                          src={msg.fileUrl}
+                          alt={msg.fileName || 'Image message'}
+                          className="max-h-56 max-w-full rounded-xl object-cover border border-white/10"
+                        />
+                        {msg.content && <p className="text-sm">{msg.content}</p>}
+                      </div>
+                    ) : msg.type === 'FILE' && msg.fileUrl ? (
+                      <a
+                        href={msg.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`inline-flex items-center gap-2 underline ${isMe ? 'text-white' : 'text-primary'}`}
+                      >
+                        <span className="material-symbols-outlined text-base">description</span>
+                        {msg.fileName || msg.content || 'Mo tep'}
+                      </a>
+                    ) : (
+                      msg.content
+                    )}
+                    <span className={`block text-[10px] ${isMe ? 'text-white/70' : 'text-outline'} mt-1 text-right`}>{formatTime(msg.createdAt || msg.sentAt)}</span>
                   </div>
                 </div>
               );
@@ -343,19 +420,44 @@ export default function ChatWindowPage() {
           <footer className="p-4 bg-surface">
             <form onSubmit={handleSendMessage} className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-2 flex items-center gap-2 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
               <div className="flex items-center gap-1 px-2">
-                <button type="button" className="p-2 text-outline hover:text-primary transition-colors">
+                <button
+                  type="button"
+                  className="p-2 text-outline hover:text-primary transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingType !== null}
+                >
                   <span className="material-symbols-outlined">attach_file</span>
                 </button>
-                <button type="button" className="p-2 text-outline hover:text-primary transition-colors">
+                <button
+                  type="button"
+                  className="p-2 text-outline hover:text-primary transition-colors"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={uploadingType !== null}
+                >
                   <span className="material-symbols-outlined">image</span>
                 </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.xlsx,.txt"
+                  onChange={(event) => handleAttachMedia(event, 'FILE')}
+                  className="hidden"
+                />
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => handleAttachMedia(event, 'IMAGE')}
+                  className="hidden"
+                />
               </div>
               <input 
                 className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-3" 
-                placeholder="Nhập tin nhắn..." 
+                placeholder={uploadingType ? 'Dang tai media...' : 'Nhập tin nhắn...'} 
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
+                disabled={uploadingType !== null}
               />
               <div className="flex items-center gap-1 px-2">
                 <button type="button" className="p-2 text-outline hover:text-primary transition-colors">

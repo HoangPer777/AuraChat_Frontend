@@ -20,7 +20,25 @@ export const uploadFile = async (file) => {
   return response.data
 }
 
+export const listMedia = async (params = { page: 0, size: 20 }) => {
+  const response = await api.get('/media', { params })
+  return response.data
+}
+
+export const getMediaDetail = async (mediaId) => {
+  const response = await api.get(`/media/${mediaId}`)
+  return response.data
+}
+
+export const deleteMedia = async (mediaId) => {
+  const response = await api.delete(`/media/${mediaId}`)
+  return response.data
+}
+
 export default {
   uploadImage,
   uploadFile,
+  listMedia,
+  getMediaDetail,
+  deleteMedia,
 }

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
-import MainLayout from '../../components/MainLayout'
-import { uploadFile, uploadImage } from '../../services/mediaService'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import useAuthStore from '../../store/authStore'
+import { deleteMedia, getMediaDetail, listMedia, uploadFile, uploadImage } from '../../services/mediaService'
 import PrimaryButton from '../../components/buttons/PrimaryButton'
 import SecondaryButton from '../../components/buttons/SecondaryButton'
 import ErrorMessage from '../../components/notifications/ErrorMessage'
@@ -25,15 +26,51 @@ const formatBytes = (bytes) => {
 }
 
 export default function MediaLibraryPage() {
+  const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [mode, setMode] = useState('image')
   const [selectedFile, setSelectedFile] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
-  const { uploads, addUpload, isLoading, error, setError, clearError, setLoading } = useMediaStore()
+  const [deletingId, setDeletingId] = useState(null)
+  const [detailsLoading, setDetailsLoading] = useState(false)
+  const {
+    uploads,
+    selectedMedia,
+    addUpload,
+    removeUpload,
+    setMediaPage,
+    setSelectedMedia,
+    isLoading,
+    error,
+    setError,
+    clearError,
+    setLoading,
+  } = useMediaStore()
   const [inputKey, setInputKey] = useState(0)
 
   const acceptText = useMemo(() => {
     return mode === 'image' ? 'image/*' : '.pdf,.docx,.xlsx,.txt'
   }, [mode])
+
+  useEffect(() => {
+    const fetchMedia = async () => {
+      setLoading(true)
+      clearError()
+      try {
+        const response = await listMedia({ page: 0, size: 24 })
+        if (response?.success && response?.data) {
+          setMediaPage(response.data)
+        }
+      } catch (err) {
+        logError(err, 'media-list')
+        setError(formatErrorMessage(err, 'media-list'))
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchMedia()
+  }, [clearError, setError, setLoading, setMediaPage])
 
   const handleFileChange = (event) => {
     const file = event.target.files?.[0] || null
@@ -69,11 +106,7 @@ export default function MediaLibraryPage() {
 
       if (result?.success) {
         const payload = result.data || {}
-        addUpload({
-          ...payload,
-          mode,
-          uploadedAt: result.timestamp || new Date().toISOString(),
-        })
+        addUpload(payload)
         setSuccessMessage(result.message || 'Tai tep thanh cong.')
         setSelectedFile(null)
         setInputKey((prev) => prev + 1)
@@ -99,163 +132,223 @@ export default function MediaLibraryPage() {
     }
   }
 
+  const handleSelectMedia = async (mediaId) => {
+    if (!mediaId) return
+    setDetailsLoading(true)
+    try {
+      const response = await getMediaDetail(mediaId)
+      if (response?.success) {
+        setSelectedMedia(response.data)
+      }
+    } catch (err) {
+      logError(err, 'media-detail', { mediaId })
+      setError(formatErrorMessage(err, 'media-detail'))
+    } finally {
+      setDetailsLoading(false)
+    }
+  }
+
+  const handleDelete = async (mediaId) => {
+    if (!mediaId) return
+    const confirmed = window.confirm('Ban co chac chan muon xoa media nay?')
+    if (!confirmed) return
+
+    setDeletingId(mediaId)
+    clearError()
+    try {
+      const response = await deleteMedia(mediaId)
+      if (response?.success) {
+        removeUpload(mediaId)
+        if (selectedMedia?.id === mediaId) {
+          setSelectedMedia(null)
+        }
+        setSuccessMessage(response.message || 'Da xoa media thanh cong.')
+      }
+    } catch (err) {
+      logError(err, 'media-delete', { mediaId })
+      setError(formatErrorMessage(err, 'media-delete'))
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
-    <MainLayout>
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,#fff6e9_0%,#f3fbf9_45%,#eef1ff_100%)] font-body-main text-on-surface">
-        <div className="max-w-6xl mx-auto px-6 py-10">
-          <header className="flex flex-col gap-4 mb-10">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-surface-container-high flex items-center justify-center shadow-sm">
-                <span className="material-symbols-outlined text-primary text-3xl">cloud_upload</span>
-              </div>
-              <div>
-                <p className="text-sm text-on-surface-variant">Quan ly tep tai len</p>
-                <h1 className="text-h1-display text-on-surface">Thu vien Media</h1>
+    <div className="bg-surface-bright text-on-surface h-screen overflow-hidden flex font-sans">
+      <aside className="z-30 flex flex-col justify-between h-screen bg-surface-container-low border-r border-outline-variant w-[80px] items-center py-4 shrink-0">
+        <div className="flex flex-col items-center w-full gap-1">
+          <button onClick={() => navigate('/chat')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
+            <span className="material-symbols-outlined">chat</span>
+          </button>
+          <button onClick={() => navigate('/friends')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
+            <span className="material-symbols-outlined">group</span>
+          </button>
+          <button onClick={() => navigate('/notifications')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
+            <span className="material-symbols-outlined">notifications</span>
+          </button>
+          <button className="text-primary border-l-4 border-primary w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
+            <span className="material-symbols-outlined">perm_media</span>
+          </button>
+        </div>
+        <button onClick={() => navigate('/profile')} className="mb-2">
+          <img
+            src={user?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || 'User')}`}
+            alt="me"
+            className="w-10 h-10 rounded-full object-cover border-2 border-outline-variant"
+          />
+        </button>
+      </aside>
+
+      <main className="flex-1 h-screen overflow-y-auto px-8 py-8">
+        <header className="mb-6">
+          <h1 className="text-2xl font-bold">Thu vien media</h1>
+          <p className="text-sm text-on-surface-variant">Quan ly tep da tai len va xoa media khong can thiet.</p>
+        </header>
+
+        {error && <ErrorMessage message={error} onDismiss={clearError} />}
+        {successMessage && <SuccessMessage message={successMessage} onDismiss={() => setSuccessMessage('')} />}
+
+        <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr_360px] gap-6">
+          <section className="bg-white rounded-2xl border border-outline-variant/40 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold">Tai len nhanh</h2>
+              <div className="flex gap-2">
+                <SecondaryButton
+                  size="sm"
+                  onClick={() => {
+                    setMode('image')
+                    setSelectedFile(null)
+                    clearError()
+                    setInputKey((prev) => prev + 1)
+                  }}
+                  className={mode === 'image' ? 'bg-primary text-on-primary' : ''}
+                >
+                  Anh
+                </SecondaryButton>
+                <SecondaryButton
+                  size="sm"
+                  onClick={() => {
+                    setMode('file')
+                    setSelectedFile(null)
+                    clearError()
+                    setInputKey((prev) => prev + 1)
+                  }}
+                  className={mode === 'file' ? 'bg-primary text-on-primary' : ''}
+                >
+                  Tep
+                </SecondaryButton>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-on-surface-variant">
-              <span className="inline-flex items-center gap-2 rounded-full bg-surface-container-low px-3 py-1">
-                <span className="material-symbols-outlined text-base text-primary">schedule</span>
-                10 luot tai moi gio
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-surface-container-low px-3 py-1">
-                <span className="material-symbols-outlined text-base text-primary">verified_user</span>
-                Yeu cau JWT
-              </span>
-            </div>
-          </header>
+            <p className="text-xs text-on-surface-variant">
+              {mode === 'image' ? 'JPG, PNG, GIF, WebP (toi da 10MB).' : 'PDF, DOCX, XLSX, TXT (toi da 10MB).'}
+            </p>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-8">
-            <section className="bg-surface-container-lowest/80 backdrop-blur rounded-3xl border border-outline-variant/60 shadow-sm p-8">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <h2 className="text-h2-sidebar text-on-surface">Tai len nhanh</h2>
-                <div className="flex gap-2">
-                  <SecondaryButton
-                    size="sm"
-                    onClick={() => {
-                      setMode('image')
-                      setSelectedFile(null)
-                      setInputKey((prev) => prev + 1)
-                      setErrorMessage('')
-                    }}
-                    className={mode === 'image' ? 'bg-primary text-on-primary' : ''}
-                  >
-                    Anh
-                  </SecondaryButton>
-                  <SecondaryButton
-                    size="sm"
-                    onClick={() => {
-                      setMode('file')
-                      setSelectedFile(null)
-                      setInputKey((prev) => prev + 1)
-                      setErrorMessage('')
-                    }}
-                    className={mode === 'file' ? 'bg-primary text-on-primary' : ''}
-                  >
-                    Tai lieu
-                  </SecondaryButton>
-                </div>
-              </div>
-
-              <p className="mt-3 text-sm text-on-surface-variant">
-                {mode === 'image'
-                  ? 'Ho tro JPG, PNG, GIF, WebP. Dung luong toi da 10MB.'
-                  : 'Ho tro PDF, DOCX, XLSX, TXT. Dung luong toi da 10MB.'}
-              </p>
-
-              <form onSubmit={handleUpload} className="mt-6 space-y-4">
-                {mode === 'image' ? (
-                  <FileInput
-                    key={`image-${inputKey}`}
-                    label="Chon anh"
-                    name="media-image"
-                    accept={acceptText}
-                    maxSize={MAX_SIZE_BYTES}
-                    onChange={handleFileChange}
-                  />
-                ) : (
-                  <div key={`file-${inputKey}`} className="space-y-2">
-                    <label className="block text-sm font-medium text-on-surface">Chon tai lieu</label>
-                    <input
-                      type="file"
-                      accept={acceptText}
-                      onChange={handleFileChange}
-                      className="block w-full text-sm text-on-surface-variant file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-surface-container-high file:text-on-surface file:font-medium hover:file:bg-surface-container"
-                    />
-                  </div>
-                )}
-
-                {error && <ErrorMessage message={error} onDismiss={clearError} />}
-                {successMessage && <SuccessMessage message={successMessage} onDismiss={() => setSuccessMessage('')} />}
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <PrimaryButton type="submit" loading={isLoading} disabled={!selectedFile}>
-                    Tai len
-                  </PrimaryButton>
-                  {selectedFile && (
-                    <span className="text-sm text-on-surface-variant">
-                      {selectedFile.name} • {formatBytes(selectedFile.size)}
-                    </span>
-                  )}
-                </div>
-              </form>
-            </section>
-
-            <section className="bg-surface-container-lowest/80 backdrop-blur rounded-3xl border border-outline-variant/60 shadow-sm p-8">
-              <div className="flex items-center justify-between">
-                <h2 className="text-h2-sidebar text-on-surface">Tep vua tai</h2>
-                <span className="text-xs text-on-surface-variant">{uploads.length} muc</span>
-              </div>
-
-              {uploads.length === 0 ? (
-                <div className="mt-6 flex flex-col items-center text-center text-on-surface-variant gap-3">
-                  <div className="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center">
-                    <span className="material-symbols-outlined text-3xl text-primary">cloud_done</span>
-                  </div>
-                  <p className="text-sm">Chua co tep nao duoc tai len. Hay bat dau tai media dau tien.</p>
-                </div>
+            <form onSubmit={handleUpload} className="space-y-4">
+              {mode === 'image' ? (
+                <FileInput
+                  key={`image-${inputKey}`}
+                  label="Chon anh"
+                  name="media-image"
+                  accept={acceptText}
+                  maxSize={MAX_SIZE_BYTES}
+                  onChange={handleFileChange}
+                />
               ) : (
-                <div className="mt-6 space-y-4 max-h-[420px] overflow-auto pr-2">
-                  {uploads.map((item, index) => (
-                    <div
-                      key={`${item.fileName || item.originalFileName}-${index}`}
-                      className="rounded-2xl border border-outline-variant/50 bg-white/70 p-4"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center overflow-hidden">
-                          {item.mode === 'image' && item.url ? (
-                            <img src={item.url} alt={item.originalFileName || 'Media'} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="material-symbols-outlined text-primary">description</span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-on-surface truncate">{item.originalFileName || item.fileName}</p>
-                          <p className="text-xs text-on-surface-variant">
-                            {item.contentType || 'Unknown'} • {formatBytes(item.size)}
-                          </p>
-                        </div>
-                      </div>
-                      {item.url && (
-                        <div className="mt-3 flex items-center gap-2">
-                          <input
-                            value={item.url}
-                            readOnly
-                            className="flex-1 text-xs text-on-surface-variant bg-surface-container-lowest border border-outline-variant/60 rounded-lg px-3 py-2"
-                          />
-                          <SecondaryButton size="sm" onClick={() => handleCopyUrl(item.url)}>
-                            Sao chep
-                          </SecondaryButton>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div key={`file-${inputKey}`} className="space-y-2">
+                  <label className="block text-sm font-medium text-on-surface">Chon tai lieu</label>
+                  <input
+                    type="file"
+                    accept={acceptText}
+                    onChange={handleFileChange}
+                    className="block w-full text-sm text-on-surface-variant file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-surface-container-high file:text-on-surface file:font-medium hover:file:bg-surface-container"
+                  />
                 </div>
               )}
-            </section>
-          </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <PrimaryButton type="submit" loading={isLoading} disabled={!selectedFile}>
+                  Tai len
+                </PrimaryButton>
+                {selectedFile && <span className="text-sm text-on-surface-variant">{selectedFile.name} • {formatBytes(selectedFile.size)}</span>}
+              </div>
+            </form>
+          </section>
+
+          <section className="bg-white rounded-2xl border border-outline-variant/40 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold">Danh sach media</h2>
+              <span className="text-xs text-on-surface-variant">{uploads.length} muc</span>
+            </div>
+
+            {isLoading ? (
+              <p className="text-sm text-on-surface-variant">Dang tai...</p>
+            ) : uploads.length === 0 ? (
+              <p className="text-sm text-on-surface-variant">Chua co media nao.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 max-h-[620px] overflow-y-auto pr-2">
+                {uploads.map((item) => (
+                  <div key={item.id || item.fileName} className="border border-outline-variant/40 rounded-xl p-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectMedia(item.id)}
+                      className="w-full text-left"
+                    >
+                      <div className="h-36 bg-surface-container rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+                        {item.mediaType === 'IMAGE' && item.url ? (
+                          <img src={item.url} alt={item.originalFileName || 'Media'} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="material-symbols-outlined text-primary text-3xl">description</span>
+                        )}
+                      </div>
+                      <p className="text-sm font-semibold truncate">{item.originalFileName || item.fileName}</p>
+                      <p className="text-xs text-on-surface-variant mt-1">{item.contentType || 'Unknown'} • {formatBytes(item.size)}</p>
+                    </button>
+                    <div className="mt-3 flex gap-2">
+                      <SecondaryButton size="sm" onClick={() => handleCopyUrl(item.url)}>
+                        Sao chep URL
+                      </SecondaryButton>
+                      <SecondaryButton
+                        size="sm"
+                        onClick={() => handleDelete(item.id)}
+                        disabled={deletingId === item.id}
+                        className="bg-red-100 text-red-700"
+                      >
+                        {deletingId === item.id ? 'Dang xoa...' : 'Xoa'}
+                      </SecondaryButton>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="bg-white rounded-2xl border border-outline-variant/40 p-5">
+            <h2 className="font-bold mb-4">Chi tiet media</h2>
+            {detailsLoading ? (
+              <p className="text-sm text-on-surface-variant">Dang tai chi tiet...</p>
+            ) : selectedMedia ? (
+              <div className="space-y-4">
+                <div className="h-48 bg-surface-container rounded-xl flex items-center justify-center overflow-hidden">
+                  {selectedMedia.mediaType === 'IMAGE' && selectedMedia.url ? (
+                    <img src={selectedMedia.url} alt={selectedMedia.originalFileName || 'Selected media'} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="material-symbols-outlined text-4xl text-primary">description</span>
+                  )}
+                </div>
+                <div className="space-y-2 text-sm">
+                  <p><span className="font-semibold">Ten file:</span> {selectedMedia.originalFileName || selectedMedia.fileName}</p>
+                  <p><span className="font-semibold">Loai:</span> {selectedMedia.contentType || 'Unknown'}</p>
+                  <p><span className="font-semibold">Dung luong:</span> {formatBytes(selectedMedia.size)}</p>
+                  <p><span className="font-semibold">Uploaded:</span> {selectedMedia.createdAt ? new Date(selectedMedia.createdAt).toLocaleString('vi-VN') : '-'}</p>
+                </div>
+                <SecondaryButton size="sm" onClick={() => handleCopyUrl(selectedMedia.url)}>
+                  Sao chep URL
+                </SecondaryButton>
+              </div>
+            ) : (
+              <p className="text-sm text-on-surface-variant">Chon mot media de xem chi tiet.</p>
+            )}
+          </section>
         </div>
-      </div>
-    </MainLayout>
+      </main>
+    </div>
   )
 }

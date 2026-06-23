@@ -42,7 +42,7 @@ export default function useIncomingCallNotifications() {
             callerAvatar: message.callerAvatar || message.senderAvatar || '',
           })
 
-          navigate('/test-ui/incoming-call', { state: message })
+          navigate('/call/incoming', { state: message })
         })
       } catch (error) {
         console.warn('Incoming call subscription failed:', error)

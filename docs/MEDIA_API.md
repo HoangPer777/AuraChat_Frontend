@@ -1,7 +1,7 @@
 # Media API Documentation
 
 ## Overview
-This document describes media upload APIs.
+This document describes media APIs used by frontend library pages (Create + Read + Delete).
 
 ---
 
@@ -37,6 +37,78 @@ Success:
   "message": "Operation completed successfully",
   "data": {},
   "timestamp": "2024-12-20T10:00:00Z"
+}
+```
+
+---
+
+### 3) List User Media
+**GET** `/api/media?page=0&size=20`
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "content": [
+      {
+        "id": "665f1d4c98d6cf3a1f6a7ab2",
+        "fileId": "ik_file_abc123",
+        "url": "https://ik.imagekit.io/your_id/media_user_abc123.png",
+        "fileName": "media_user_abc123.png",
+        "originalFileName": "photo.png",
+        "contentType": "image/png",
+        "size": 12345,
+        "provider": "ImageKit",
+        "mediaType": "IMAGE",
+        "createdAt": "2026-06-23T10:00:00Z"
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalElements": 1,
+    "totalPages": 1,
+    "first": true,
+    "last": true
+  }
+}
+```
+
+---
+
+### 4) Get Media Detail
+**GET** `/api/media/{mediaId}`
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "665f1d4c98d6cf3a1f6a7ab2",
+    "fileId": "ik_file_abc123",
+    "url": "https://ik.imagekit.io/your_id/media_user_abc123.png",
+    "fileName": "media_user_abc123.png",
+    "originalFileName": "photo.png",
+    "contentType": "image/png",
+    "size": 12345,
+    "provider": "ImageKit",
+    "mediaType": "IMAGE",
+    "createdAt": "2026-06-23T10:00:00Z"
+  }
+}
+```
+
+---
+
+### 5) Delete Media
+**DELETE** `/api/media/{mediaId}`
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "message": "Media deleted successfully",
+  "data": null
 }
 ```
 

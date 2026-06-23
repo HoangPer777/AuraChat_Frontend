@@ -33,7 +33,7 @@ export default function HomePage() {
 
   const handleConversationClick = (conversation) => {
     setActiveConversation(conversation);
-    navigate('/test-ui/chat');
+    navigate('/chat/window');
   };
 
   // Lấy tên hiển thị của conversation
@@ -87,11 +87,11 @@ export default function HomePage() {
             <button className="text-primary border-l-4 border-primary w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
               <span className="material-symbols-outlined">chat</span>
             </button>
-            <button onClick={() => navigate('/test-ui/friends')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
+            <button onClick={() => navigate('/friends')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
               <span className="material-symbols-outlined">group</span>
             </button>
             <div className="relative w-full flex justify-center">
-              <button onClick={() => navigate('/test-ui/notifications')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
+              <button onClick={() => navigate('/notifications')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors">
                 <span className="material-symbols-outlined">notifications</span>
               </button>
               <span className="absolute top-3 right-5 bg-error text-white text-[10px] px-1.5 py-0.5 rounded-full border-2 border-surface-container-low">5</span>
@@ -102,7 +102,7 @@ export default function HomePage() {
           </nav>
         </div>
         <div className="w-full flex flex-col items-center pb-4">
-          <button onClick={() => navigate('/test-ui/profile-new')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors rounded-full overflow-hidden">
+          <button onClick={() => navigate('/profile')} className="text-on-surface-variant w-full flex justify-center py-4 hover:bg-surface-container-high transition-colors rounded-full overflow-hidden">
             <img alt="User Profile" className="w-10 h-10 rounded-full border-2 border-outline-variant object-cover" src={user?.avatar || "https://ui-avatars.com/api/?name=" + (user?.displayName || "User")} />
           </button>
         </div>
@@ -112,7 +112,7 @@ export default function HomePage() {
       <main className="ml-[80px] w-[320px] h-screen bg-surface-container-lowest border-r border-outline-variant flex flex-col shrink-0">
         <header className="p-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-on-surface">Tin nhắn</h1>
-          <button onClick={() => navigate('/test-ui/create-group')} className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container-high text-primary hover:bg-primary-container hover:text-white transition-all">
+          <button onClick={() => navigate('/create-group')} className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container-high text-primary hover:bg-primary-container hover:text-white transition-all">
             <span className="material-symbols-outlined">edit_square</span>
           </button>
         </header>
@@ -168,7 +168,7 @@ export default function HomePage() {
             Chọn một cuộc trò chuyện từ danh sách bên trái để bắt đầu nhắn tin ngay. Trải nghiệm giao tiếp thông minh và bảo mật.
           </p>
           <div className="pt-4">
-            <button onClick={() => navigate('/test-ui/create-group')} className="bg-primary text-white font-bold py-3 px-8 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all">
+            <button onClick={() => navigate('/create-group')} className="bg-primary text-white font-bold py-3 px-8 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all">
               Bắt đầu hội thoại mới
             </button>
           </div>

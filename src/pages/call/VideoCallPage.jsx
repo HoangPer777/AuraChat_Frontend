@@ -52,7 +52,7 @@ export default function VideoCallPage() {
 
   useEffect(() => {
     if (!callIntent) {
-      navigate('/test-ui/home', { replace: true })
+      navigate('/chat', { replace: true })
     }
   }, [callIntent, navigate])
 

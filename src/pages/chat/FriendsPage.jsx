@@ -373,7 +373,7 @@ export default function FriendsPage() {
     await loadDiscover(0, true)
   }
 
-  const handleChat = (friendId) => navigate('/chat', { state: { friendId } })
+  const handleChat = (friendId) => navigate('/chat/window', { state: { friendId } })
 
   const handleVideoCall = (friend) => {
     if (!friend?.id) return
@@ -387,7 +387,7 @@ export default function FriendsPage() {
     }
 
     saveCallSession(callSession)
-    navigate('/test-ui/video-call', { state: callSession })
+    navigate('/call/video', { state: callSession })
   }
 
   const isSearching = searchTerm.trim().length > 0
@@ -401,7 +401,7 @@ export default function FriendsPage() {
         <div className="flex flex-col items-center w-full gap-1">
           <NavBtn icon="chat" label="Chat" onClick={() => navigate('/chat')} />
           <NavBtn icon="group" label="Bạn bè" active />
-          <NavBtn icon="notifications" label="Thông báo" onClick={() => navigate('/test-ui/notifications')} />
+          <NavBtn icon="notifications" label="Thông báo" onClick={() => navigate('/notifications')} />
           <NavBtn icon="settings" label="Cài đặt" />
         </div>
         <button onClick={() => navigate('/profile')} className="mb-2">

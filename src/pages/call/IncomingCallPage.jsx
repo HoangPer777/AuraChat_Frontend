@@ -15,7 +15,7 @@ export default function IncomingCallPage() {
       <div className="min-h-screen flex items-center justify-center bg-background text-on-background">
         <div className="text-center space-y-4">
           <p className="text-lg font-semibold">Không tìm thấy dữ liệu cuộc gọi</p>
-          <button onClick={() => navigate('/test-ui/home')} className="px-4 py-2 rounded-xl bg-primary text-white">Về trang chat</button>
+          <button onClick={() => navigate('/chat')} className="px-4 py-2 rounded-xl bg-primary text-white">Về trang chat</button>
         </div>
       </div>
     )
@@ -41,7 +41,7 @@ export default function IncomingCallPage() {
     }
 
     saveCallSession(acceptedCall)
-    navigate('/test-ui/video-call', { state: acceptedCall })
+    navigate('/call/video', { state: acceptedCall })
   }
 
   return (

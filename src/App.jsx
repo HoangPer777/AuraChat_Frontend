@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { Suspense, lazy, Component } from 'react'
+import { Component } from 'react'
 import ProtectedRoute from './components/ProtectedRoute'
 import useAuthStore from './store/authStore'
 import LoginPage from './pages/auth/LoginPage'
@@ -7,8 +7,6 @@ import RegisterPage from './pages/auth/RegisterPage'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
 import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import OAuth2CallbackPage from './pages/auth/OAuth2CallbackPage'
-import ChatPage from './pages/chat/ChatPage'
-import FindUsersPage from './pages/FindUsersPage'
 import HomePage from './pages/chat/HomePage'
 import ChatWindowPage from './pages/chat/ChatWindowPage'
 import FriendsPage from './pages/chat/FriendsPage'
@@ -24,18 +22,6 @@ import BannedIpsPage from './pages/admin/BannedIpsPage'
 import AdminLayout from './components/admin/AdminLayout'
 import ProfilePageNew from './pages/chat/ProfilePage'
 import MediaLibraryPage from './pages/media/MediaLibraryPage'
-
-// Lazy load ProfilePage for code splitting
-const ProfilePage = lazy(() => import('./pages/auth/ProfilePage'))
-
-// Loading fallback component
-function LoadingFallback() {
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-    </div>
-  )
-}
 
 // Error Boundary để bắt crash thay vì trang trắng
 class ErrorBoundary extends Component {
@@ -87,17 +73,18 @@ function App() {
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/chat" element={<ChatPage />} />
-            <Route path="/users" element={<FindUsersPage />} />
+            <Route path="/chat" element={<HomePage />} />
+            <Route path="/chat/window" element={<ChatWindowPage />} />
+            <Route path="/friends" element={<FriendsPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/create-group" element={<CreateGroupPage />} />
             <Route path="/media" element={<MediaLibraryPage />} />
-            <Route
-              path="/profile"
-              element={
-                <Suspense fallback={<LoadingFallback />}>
-                  <ProfilePage />
-                </Suspense>
-              }
-            />
+            <Route path="/profile" element={<ProfilePageNew />} />
+            <Route path="/users" element={<Navigate to="/friends" replace />} />
+            <Route path="/call/incoming" element={<IncomingCallPage />} />
+            <Route path="/call/outgoing" element={<CallingPage />} />
+            <Route path="/call/audio" element={<AudioCallPage />} />
+            <Route path="/call/video" element={<VideoCallPage />} />
           </Route>
 
           <Route element={<ProtectedRoute requiredRole="ADMIN" />}>
@@ -108,17 +95,17 @@ function App() {
             </Route>
           </Route>
 
-          {/* Test UI Routes */}
-          <Route path="/test-ui/home" element={<HomePage />} />
-          <Route path="/test-ui/chat" element={<ChatWindowPage />} />
-          <Route path="/test-ui/friends" element={<FriendsPage />} />
-          <Route path="/test-ui/create-group" element={<CreateGroupPage />} />
-          <Route path="/test-ui/profile-new" element={<ProfilePageNew />} />
-          <Route path="/test-ui/notifications" element={<NotificationsPage />} />
-          <Route path="/test-ui/incoming-call" element={<IncomingCallPage />} />
-          <Route path="/test-ui/calling" element={<CallingPage />} />
-          <Route path="/test-ui/audio-call" element={<AudioCallPage />} />
-          <Route path="/test-ui/video-call" element={<VideoCallPage />} />
+          {/* Legacy UI redirects */}
+          <Route path="/test-ui/home" element={<Navigate to="/chat" replace />} />
+          <Route path="/test-ui/chat" element={<Navigate to="/chat/window" replace />} />
+          <Route path="/test-ui/friends" element={<Navigate to="/friends" replace />} />
+          <Route path="/test-ui/create-group" element={<Navigate to="/create-group" replace />} />
+          <Route path="/test-ui/profile-new" element={<Navigate to="/profile" replace />} />
+          <Route path="/test-ui/notifications" element={<Navigate to="/notifications" replace />} />
+          <Route path="/test-ui/incoming-call" element={<Navigate to="/call/incoming" replace />} />
+          <Route path="/test-ui/calling" element={<Navigate to="/call/outgoing" replace />} />
+          <Route path="/test-ui/audio-call" element={<Navigate to="/call/audio" replace />} />
+          <Route path="/test-ui/video-call" element={<Navigate to="/call/video" replace />} />
           <Route path="/test-ui/admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="/test-ui/admin-users" element={<Navigate to="/admin/users" replace />} />
 
