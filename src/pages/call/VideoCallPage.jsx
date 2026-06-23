@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
-import { connect, disconnect, isConnected, subscribe, unsubscribe } from '../../services/websocket'
+import { connect, isConnected, subscribe } from '../../services/websocket'
 import { clearCallSession, loadCallSession, saveCallSession } from '../../utils/callSession'
 import {
   createPeerConnection,
@@ -76,9 +76,9 @@ export default function VideoCallPage() {
     if (!callIntent) return undefined
 
     let mounted = true
-    let subscriptionActive = false
+    let removeCallListener = null
 
-    const cleanupMedia = async () => {
+    const cleanupMedia = () => {
       localStreamRef.current?.getTracks?.().forEach((track) => track.stop())
       localStreamRef.current = null
 
@@ -92,10 +92,6 @@ export default function VideoCallPage() {
 
       peerConnectionRef.current?.close?.()
       peerConnectionRef.current = null
-
-      if (isConnected()) {
-        await disconnect().catch(() => {})
-      }
     }
 
     const resolveTimestampMs = (...values) => {
@@ -251,7 +247,7 @@ export default function VideoCallPage() {
       if (message.status === 'DECLINED' || message.status === 'COMPLETED' || message.status === 'MISSED') {
         setCallStatus('ended')
         setStatusText(message.message || 'Cuộc gọi đã kết thúc')
-        await cleanupMedia()
+        cleanupMedia()
         clearCallSession()
         return
       }
@@ -309,6 +305,11 @@ export default function VideoCallPage() {
     const createConnection = async () => {
       const localStream = await getLocalStream(callIntent.type || 'VIDEO')
       if (!mounted) return
+
+      const hasVideoTrack = localStream.getVideoTracks().length > 0
+      if (!hasVideoTrack) {
+        setIsCamOn(false)
+      }
 
       localStreamRef.current = localStream
       attachStreamToLocalPreview(localStream)
@@ -386,8 +387,7 @@ export default function VideoCallPage() {
         await connect()
         if (!mounted) return
 
-        subscribe('/user/queue/call', handleCallMessage)
-        subscriptionActive = true
+        removeCallListener = subscribe('/user/queue/call', handleCallMessage)
         await createConnection()
       } catch (error) {
         console.error('Failed to initialize call:', error)
@@ -400,9 +400,7 @@ export default function VideoCallPage() {
 
     return () => {
       mounted = false
-      if (subscriptionActive) {
-        unsubscribe('/user/queue/call')
-      }
+      removeCallListener?.()
       cleanupMedia()
     }
   }, [callIntent, user?.id])

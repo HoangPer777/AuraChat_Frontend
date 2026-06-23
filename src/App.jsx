@@ -21,6 +21,7 @@ import UsersPage from './pages/admin/UsersPage'
 import BannedIpsPage from './pages/admin/BannedIpsPage'
 import AdminLayout from './components/admin/AdminLayout'
 import UserLayout from './components/user/UserLayout'
+import UserRealtimeSync from './components/user/UserRealtimeSync'
 import ProfilePageNew from './pages/chat/ProfilePage'
 import MediaLibraryPage from './pages/media/MediaLibraryPage'
 
@@ -74,20 +75,22 @@ function App() {
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
-            <Route element={<UserLayout />}>
-              <Route path="/chat" element={<HomePage />} />
-              <Route path="/chat/window" element={<ChatWindowPage />} />
-              <Route path="/friends" element={<FriendsPage />} />
-              <Route path="/notifications" element={<NotificationsPage />} />
-              <Route path="/create-group" element={<CreateGroupPage />} />
-              <Route path="/media" element={<MediaLibraryPage />} />
-              <Route path="/profile" element={<ProfilePageNew />} />
-              <Route path="/users" element={<Navigate to="/friends" replace />} />
+            <Route element={<UserRealtimeSync />}>
+              <Route element={<UserLayout />}>
+                <Route path="/chat" element={<HomePage />} />
+                <Route path="/chat/window" element={<ChatWindowPage />} />
+                <Route path="/friends" element={<FriendsPage />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
+                <Route path="/create-group" element={<CreateGroupPage />} />
+                <Route path="/media" element={<MediaLibraryPage />} />
+                <Route path="/profile" element={<ProfilePageNew />} />
+                <Route path="/users" element={<Navigate to="/friends" replace />} />
+              </Route>
+              <Route path="/call/incoming" element={<IncomingCallPage />} />
+              <Route path="/call/outgoing" element={<CallingPage />} />
+              <Route path="/call/audio" element={<AudioCallPage />} />
+              <Route path="/call/video" element={<VideoCallPage />} />
             </Route>
-            <Route path="/call/incoming" element={<IncomingCallPage />} />
-            <Route path="/call/outgoing" element={<CallingPage />} />
-            <Route path="/call/audio" element={<AudioCallPage />} />
-            <Route path="/call/video" element={<VideoCallPage />} />
           </Route>
 
           <Route element={<ProtectedRoute requiredRole="ADMIN" />}>

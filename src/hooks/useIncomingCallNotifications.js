@@ -1,30 +1,39 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { connect, isConnected, subscribe, unsubscribe } from '../services/websocket'
+import { connect, isConnected, subscribe } from '../services/websocket'
 import useAuthStore from '../store/authStore'
 import { saveCallSession } from '../utils/callSession'
 
-function isCallOffer(message) {
-  return message?.callId && message?.sdp && (message?.type === 'VIDEO' || message?.type === 'AUDIO')
+function isIncomingCallOffer(message) {
+  return Boolean(
+    message?.callId
+    && message?.sdp
+    && message?.callerId
+    && message?.receiverId
+    && (message?.type === 'VIDEO' || message?.type === 'AUDIO')
+  )
 }
 
 export default function useIncomingCallNotifications() {
   const navigate = useNavigate()
+  const navigateRef = useRef(navigate)
   const { user, accessToken } = useAuthStore()
+
+  navigateRef.current = navigate
 
   useEffect(() => {
     if (!accessToken || !user?.id) return undefined
 
     let active = true
-    let subscription = null
+    let removeListener = null
 
     const setup = async () => {
       try {
         await connect()
         if (!active || !isConnected()) return
 
-        subscription = subscribe('/user/queue/call', (message) => {
-          if (!active || !isCallOffer(message)) return
+        removeListener = subscribe('/user/queue/call', (message) => {
+          if (!active || !isIncomingCallOffer(message)) return
           if (message.receiverId && message.receiverId !== user.id) return
 
           saveCallSession({
@@ -42,7 +51,7 @@ export default function useIncomingCallNotifications() {
             callerAvatar: message.callerAvatar || message.senderAvatar || '',
           })
 
-          navigate('/call/incoming', { state: message })
+          navigateRef.current('/call/incoming', { state: message })
         })
       } catch (error) {
         console.warn('Incoming call subscription failed:', error)
@@ -53,9 +62,7 @@ export default function useIncomingCallNotifications() {
 
     return () => {
       active = false
-      if (subscription) {
-        unsubscribe('/user/queue/call')
-      }
+      removeListener?.()
     }
-  }, [accessToken, navigate, user?.id])
+  }, [accessToken, user?.id])
 }

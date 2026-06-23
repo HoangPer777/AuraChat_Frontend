@@ -26,11 +26,32 @@ export function createPeerConnection({ onTrack, onIceCandidate, onConnectionStat
 }
 
 export async function getLocalStream(kind = 'VIDEO') {
-  const constraints = kind === 'AUDIO'
-    ? { audio: true, video: false }
-    : { audio: true, video: true }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error('Trình duyệt không hỗ trợ camera hoặc microphone.')
+  }
 
-  return navigator.mediaDevices.getUserMedia(constraints)
+  if (kind === 'AUDIO') {
+    return navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+  }
+
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+  } catch (error) {
+    const recoverable = ['NotFoundError', 'NotReadableError', 'OverconstrainedError']
+    if (recoverable.includes(error?.name)) {
+      try {
+        return await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      } catch (audioError) {
+        throw new Error('Không tìm thấy camera hoặc microphone. Hãy kiểm tra thiết bị và quyền truy cập.')
+      }
+    }
+
+    if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
+      throw new Error('Bạn cần cho phép quyền camera/microphone để thực hiện cuộc gọi.')
+    }
+
+    throw error
+  }
 }
 
 export function publishCallOffer(payload) {

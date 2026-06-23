@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { connect, isConnected, subscribe, unsubscribe } from '../services/websocket'
+import { connect, isConnected, subscribe } from '../services/websocket'
 import useAuthStore from '../store/authStore'
 import useChatStore from '../store/chatStore'
 import { isMessageForActiveConversation } from '../utils/chatMessages'
@@ -15,13 +15,15 @@ export default function useChatWebSocket() {
     if (!accessToken || !user?.id) return undefined
 
     let active = true
+    let removeMessagesListener = null
+    let removePresenceListener = null
 
     const setup = async () => {
       try {
         await connect()
         if (!active || !isConnected()) return
 
-        subscribe('/user/queue/messages', (message) => {
+        removeMessagesListener = subscribe('/user/queue/messages', (message) => {
           if (!active || !message?.id) return
 
           const store = useChatStore.getState()
@@ -46,7 +48,7 @@ export default function useChatWebSocket() {
           })
         })
 
-        subscribe('/user/queue/presence', (presence) => {
+        removePresenceListener = subscribe('/user/queue/presence', (presence) => {
           if (!active || !presence?.userId) return
           useChatStore.getState().setFriendOnlineStatus(
             presence.userId,
@@ -62,8 +64,8 @@ export default function useChatWebSocket() {
 
     return () => {
       active = false
-      unsubscribe('/user/queue/messages')
-      unsubscribe('/user/queue/presence')
+      removeMessagesListener?.()
+      removePresenceListener?.()
     }
   }, [accessToken, user?.id])
 }

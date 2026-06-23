@@ -239,16 +239,29 @@ export function subscribe(destination, callback) {
     attachStompSubscription(destination)
   }
 
-  return {
-    destination,
-    callback,
+  return () => unsubscribeListener(destination, callback)
+}
+
+function unsubscribeListener(destination, callback) {
+  const listeners = listenerRegistry.get(destination)
+  if (!listeners?.has(callback)) {
+    return false
   }
+
+  listeners.delete(callback)
+  if (listeners.size === 0) {
+    listenerRegistry.delete(destination)
+    const subscription = stompSubscriptions.get(destination)
+    subscription?.unsubscribe()
+    stompSubscriptions.delete(destination)
+    console.log(`Unsubscribed from ${destination}`)
+  }
+
+  return true
 }
 
 /**
- * Unsubscribe from a destination
- * @param {string} destination - STOMP destination to unsubscribe from
- * @returns {boolean} True if unsubscribed, false if not subscribed
+ * Unsubscribe all listeners for a destination
  */
 export function unsubscribe(destination) {
   listenerRegistry.delete(destination)

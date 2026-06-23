@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { connect, subscribe, unsubscribe, isConnected } from '../services/websocket'
+import { connect, isConnected, subscribe } from '../services/websocket'
 import useAuthStore from '../store/authStore'
 import useFriendStore from '../store/friendStore'
 
@@ -15,14 +15,14 @@ export default function useFriendRequestNotifications() {
     if (!accessToken) return undefined
 
     let active = true
-    let subscription = null
+    let removeListener = null
 
     const setup = async () => {
       try {
         await connect()
         if (!active || !isConnected()) return
 
-        subscription = subscribe('/user/queue/friend-requests', (message) => {
+        removeListener = subscribe('/user/queue/friend-requests', (message) => {
           if (!active || !isFriendRequestPayload(message)) return
 
           const request = message.request
@@ -53,9 +53,7 @@ export default function useFriendRequestNotifications() {
 
     return () => {
       active = false
-      if (subscription) {
-        unsubscribe('/user/queue/friend-requests')
-      }
+      removeListener?.()
     }
   }, [accessToken, addFriend, removePendingRequest, upsertPendingRequest])
 }
