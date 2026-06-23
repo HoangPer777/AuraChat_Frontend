@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { sortMessagesAscending } from '../utils/chatMessages'
 
 /**
  * Chat Store - Manages chat state including conversations and messages
@@ -32,22 +33,36 @@ const useChatStore = create((set, get) => ({
   setConversations: (conversations) => set({ conversations, error: null }),
 
   /**
-   * Set active conversation and clear messages
-   * Messages will be fetched separately
+   * Set active conversation. Clears messages unless keepMessages is true.
    */
-  setActiveConversation: (conversation) => set({ activeConversation: conversation, messages: [] }),
+  setActiveConversation: (conversation, keepMessages = false) =>
+    set((state) => ({
+      activeConversation: conversation,
+      messages: keepMessages ? state.messages : [],
+    })),
 
   /**
-   * Add a new message to the messages array
-   * Used for real-time message reception via WebSocket
+   * Patch fields on active conversation without clearing messages.
    */
-  addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
+  patchActiveConversation: (updates) =>
+    set((state) => ({
+      activeConversation: state.activeConversation
+        ? { ...state.activeConversation, ...updates }
+        : null,
+    })),
+
+  /**
+   * Add a new message to the messages array (keeps chronological order).
+   */
+  addMessage: (message) =>
+    set((state) => ({
+      messages: sortMessagesAscending([...state.messages, message]),
+    })),
 
   /**
    * Set complete messages array for active conversation
-   * Used when fetching message history
    */
-  setMessages: (messages) => set({ messages, error: null }),
+  setMessages: (messages) => set({ messages: sortMessagesAscending(messages), error: null }),
 
   /**
    * Update an existing message (e.g., status change, edit)

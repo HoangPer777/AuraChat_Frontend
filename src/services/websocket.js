@@ -10,7 +10,9 @@ import SockJS from 'sockjs-client'
  */
 
 let stompClient = null
-let subscriptions = new Map()
+let stompSubscriptions = new Map()
+let listenerRegistry = new Map()
+let connectPromise = null
 let reconnectAttempts = 0
 const MAX_RECONNECT_ATTEMPTS = 5
 const BACKOFF_DELAYS = [1000, 2000, 4000, 8000, 16000, 32000]
@@ -61,6 +63,41 @@ function buildClientOptions(accessToken) {
   return options
 }
 
+function notifyListeners(destination, body) {
+  const listeners = listenerRegistry.get(destination)
+  if (!listeners) return
+  listeners.forEach((callback) => {
+    try {
+      callback(body)
+    } catch (error) {
+      console.error(`Listener error for ${destination}:`, error)
+    }
+  })
+}
+
+function attachStompSubscription(destination) {
+  if (!stompClient?.connected || stompSubscriptions.has(destination)) {
+    return
+  }
+
+  const subscription = stompClient.subscribe(destination, (message) => {
+    try {
+      notifyListeners(destination, JSON.parse(message.body))
+    } catch {
+      notifyListeners(destination, message.body)
+    }
+  })
+
+  stompSubscriptions.set(destination, subscription)
+  console.log(`Subscribed to ${destination}`)
+}
+
+function resubscribeAll() {
+  stompSubscriptions.forEach((subscription) => subscription.unsubscribe())
+  stompSubscriptions.clear()
+  listenerRegistry.forEach((_, destination) => attachStompSubscription(destination))
+}
+
 /**
  * Initialize and connect to WebSocket server
  * @param {Function} onConnected - Callback when connection is established
@@ -69,14 +106,18 @@ function buildClientOptions(accessToken) {
  * @returns {Promise<Client>} STOMP client instance
  */
 export async function connect(onConnected, onDisconnected, onError) {
-  return new Promise((resolve, reject) => {
-    if (stompClient && stompClient.active) {
-      resolve(stompClient)
-      return
-    }
+  if (stompClient?.connected) {
+    return stompClient
+  }
 
+  if (connectPromise) {
+    return connectPromise
+  }
+
+  connectPromise = new Promise((resolve, reject) => {
     const accessToken = localStorage.getItem('accessToken')
     if (!accessToken) {
+      connectPromise = null
       const error = new Error('No access token available')
       onError?.(error)
       reject(error)
@@ -90,20 +131,25 @@ export async function connect(onConnected, onDisconnected, onError) {
       onConnect: (frame) => {
         setConnectionState('connected')
         reconnectAttempts = 0
+        connectPromise = null
+        resubscribeAll()
         onConnected?.(frame)
         resolve(stompClient)
       },
       onDisconnect: (frame) => {
         setConnectionState('disconnected')
+        stompSubscriptions.clear()
         onDisconnected?.(frame)
       },
       onStompError: (frame) => {
+        connectPromise = null
         const error = new Error(`STOMP error: ${frame.body}`)
         setConnectionState('disconnected')
         onError?.(error)
         reject(error)
       },
       onWebSocketError: (error) => {
+        connectPromise = null
         setConnectionState('disconnected')
         onError?.(error)
         reject(error)
@@ -112,6 +158,8 @@ export async function connect(onConnected, onDisconnected, onError) {
 
     stompClient.activate()
   })
+
+  return connectPromise
 }
 
 /**
@@ -120,7 +168,7 @@ export async function connect(onConnected, onDisconnected, onError) {
  */
 export async function disconnect() {
   return new Promise((resolve) => {
-    if (!stompClient || !stompClient.active) {
+    if (!stompClient || !stompClient.connected) {
       setConnectionState('disconnected')
       resolve()
       return
@@ -129,7 +177,9 @@ export async function disconnect() {
     stompClient.deactivate({
       onDisconnect: () => {
         setConnectionState('disconnected')
-        subscriptions.clear()
+        stompSubscriptions.clear()
+        listenerRegistry.clear()
+        connectPromise = null
         resolve()
       },
     })
@@ -180,29 +230,19 @@ export async function reconnect(onConnected, onDisconnected, onError) {
  * @returns {Object} Subscription object with unsubscribe method
  */
 export function subscribe(destination, callback) {
-  if (!stompClient || !stompClient.active) {
-    console.warn('WebSocket not connected. Cannot subscribe to', destination)
-    return null
+  if (!listenerRegistry.has(destination)) {
+    listenerRegistry.set(destination, new Set())
+  }
+  listenerRegistry.get(destination).add(callback)
+
+  if (stompClient?.connected) {
+    attachStompSubscription(destination)
   }
 
-  if (subscriptions.has(destination)) {
-    console.warn(`Already subscribed to ${destination}`)
-    return subscriptions.get(destination)
+  return {
+    destination,
+    callback,
   }
-
-  const subscription = stompClient.subscribe(destination, (message) => {
-    try {
-      const body = JSON.parse(message.body)
-      callback(body)
-    } catch {
-      callback(message.body)
-    }
-  })
-
-  subscriptions.set(destination, subscription)
-  console.log(`Subscribed to ${destination}`)
-
-  return subscription
 }
 
 /**
@@ -211,14 +251,15 @@ export function subscribe(destination, callback) {
  * @returns {boolean} True if unsubscribed, false if not subscribed
  */
 export function unsubscribe(destination) {
-  const subscription = subscriptions.get(destination)
+  listenerRegistry.delete(destination)
+
+  const subscription = stompSubscriptions.get(destination)
   if (!subscription) {
-    console.warn(`Not subscribed to ${destination}`)
     return false
   }
 
   subscription.unsubscribe()
-  subscriptions.delete(destination)
+  stompSubscriptions.delete(destination)
   console.log(`Unsubscribed from ${destination}`)
 
   return true
@@ -228,11 +269,9 @@ export function unsubscribe(destination) {
  * Unsubscribe from all destinations
  */
 export function unsubscribeAll() {
-  subscriptions.forEach((subscription, destination) => {
-    subscription.unsubscribe()
-    console.log(`Unsubscribed from ${destination}`)
-  })
-  subscriptions.clear()
+  stompSubscriptions.forEach((subscription) => subscription.unsubscribe())
+  stompSubscriptions.clear()
+  listenerRegistry.clear()
 }
 
 /**
@@ -242,7 +281,7 @@ export function unsubscribeAll() {
  * @param {Object} headers - Optional STOMP headers
  */
 export function send(destination, body, headers = {}) {
-  if (!stompClient || !stompClient.active) {
+  if (!stompClient || !stompClient.connected) {
     console.error('WebSocket not connected. Cannot send message to', destination)
     return false
   }
@@ -273,7 +312,7 @@ export function getConnectionState() {
  * @returns {boolean} True if connected, false otherwise
  */
 export function isConnected() {
-  return connectionState === 'connected' && stompClient?.active
+  return connectionState === 'connected' && stompClient?.connected
 }
 
 /**
@@ -289,7 +328,7 @@ export function getStompClient() {
  * @returns {number} Number of subscriptions
  */
 export function getSubscriptionCount() {
-  return subscriptions.size
+  return listenerRegistry.size
 }
 
 /**
@@ -297,7 +336,7 @@ export function getSubscriptionCount() {
  * @returns {Array<string>} Array of destination strings
  */
 export function getSubscribedDestinations() {
-  return Array.from(subscriptions.keys())
+  return Array.from(listenerRegistry.keys())
 }
 
 /**
