@@ -71,6 +71,18 @@ const useNotificationStore = create((set, get) => ({
       return { items }
     }),
 
+  markConversationAsRead: (conversationId) =>
+    set((state) => {
+      if (!conversationId) return state
+      const items = state.items.map((item) =>
+        item.type === 'MESSAGE' && item.conversationId === conversationId
+          ? { ...item, read: true }
+          : item,
+      )
+      persistNotifications(items)
+      return { items }
+    }),
+
   removeNotification: (id) =>
     set((state) => {
       const items = state.items.filter((item) => item.id !== id)

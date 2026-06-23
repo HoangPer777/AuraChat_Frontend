@@ -1,20 +1,9 @@
 import { useEffect } from 'react'
 import { connect, isConnected, subscribe } from '../services/websocket'
 import useAuthStore from '../store/authStore'
-import useChatStore from '../store/chatStore'
 import useNotificationStore from '../store/notificationStore'
 import { showBrowserNotification } from '../utils/browserNotification'
 import { isGroupCallInvite } from '../utils/callHelpers'
-
-function buildMessagePreview(message) {
-  if (!message) return 'Tin nhắn mới'
-  if (message.type === 'IMAGE') return 'Đã gửi một hình ảnh'
-  if (message.type === 'STICKER') return 'Sticker'
-  if (message.type === 'VOICE') return 'Tin nhắn thoại'
-  if (message.type === 'FILE') return 'Đã gửi một tệp'
-  if (message.type === 'CALL_LOG') return 'Cuộc gọi'
-  return message.content || 'Tin nhắn mới'
-}
 
 export default function useNotificationHub() {
   const { accessToken, user } = useAuthStore()
@@ -60,35 +49,6 @@ export default function useNotificationHub() {
                 onClick: () => window.location.assign('/notifications'),
               })
             }
-          }),
-        )
-
-        removeListeners.push(
-          subscribe('/user/queue/messages', (message) => {
-            if (!active || !message?.id || message.senderId === user.id) return
-
-            const activeConversation = useChatStore.getState().activeConversation
-            if (activeConversation?.id === message.conversationId && document.hasFocus()) {
-              return
-            }
-
-            const preview = buildMessagePreview(message)
-            addNotification({
-              id: `msg-${message.id}`,
-              type: 'MESSAGE',
-              title: 'Tin nhắn mới',
-              message: preview,
-              conversationId: message.conversationId,
-              messageId: message.id,
-              route: '/chat/window',
-            })
-            pushBrowser({
-              title: 'Tin nhắn mới',
-              body: preview,
-              tag: `msg-${message.conversationId}`,
-              data: { route: '/chat/window', conversationId: message.conversationId },
-              onClick: () => window.location.assign('/chat/window'),
-            })
           }),
         )
 

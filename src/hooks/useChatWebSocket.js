@@ -3,6 +3,7 @@ import { connect, isConnected, subscribe } from '../services/websocket'
 import useAuthStore from '../store/authStore'
 import useChatStore from '../store/chatStore'
 import { isMessageForActiveConversation } from '../utils/chatMessages'
+import { notifyInboundMessage } from '../utils/inboundMessageNotification'
 
 /**
  * Subscribe real-time messages qua STOMP.
@@ -45,6 +46,10 @@ export default function useChatWebSocket() {
             sentAt: message.createdAt,
             type: message.type,
           })
+
+          if (message.senderId !== user.id) {
+            notifyInboundMessage(message, user.id)
+          }
         })
       } catch (error) {
         console.warn('Chat WebSocket subscription failed:', error)

@@ -24,6 +24,7 @@ export default function NotificationsPage() {
     items,
     markAsRead,
     markAllAsRead,
+    markConversationAsRead,
     removeNotification,
     clearAll,
   } = useNotificationStore();
@@ -57,9 +58,11 @@ export default function NotificationsPage() {
     return merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [items, pendingRequests]);
 
-  const filteredNotifs = filter === 'all'
-    ? notifications
-    : notifications.filter((n) => n.type === filter.toUpperCase());
+  const filterType = filter === 'all' ? null : filter.toUpperCase().replace(/-/g, '_');
+
+  const filteredNotifs = filterType
+    ? notifications.filter((n) => n.type === filterType)
+    : notifications;
 
   const selected = filteredNotifs.find((item) => item.id === selectedId) || filteredNotifs[0] || null;
 
@@ -68,8 +71,13 @@ export default function NotificationsPage() {
     markAsRead(notif.id);
 
     if (notif.type === 'MESSAGE' && notif.conversationId) {
+      markConversationAsRead(notif.conversationId);
       const conversation = conversations.find((item) => item.id === notif.conversationId);
-      if (conversation) setActiveConversation(conversation);
+      if (conversation) {
+        setActiveConversation(conversation);
+      } else {
+        setActiveConversation({ id: notif.conversationId });
+      }
       navigate('/chat/window');
       return;
     }
@@ -177,7 +185,13 @@ export default function NotificationsPage() {
                 <p className="text-sm text-outline">{formatTimeAgo(selected.createdAt)}</p>
               </div>
             </div>
-            <p className="text-sm text-on-surface-variant mb-6">{selected.message}</p>
+            <p className="text-sm text-on-surface-variant mb-6">
+              {selected.type === 'FRIEND_REQUEST'
+                ? `${selected.title} ${selected.message}`
+                : selected.type !== 'MESSAGE'
+                  ? selected.message
+                  : null}
+            </p>
 
             {selected.type === 'FRIEND_REQUEST' && selected.requestId && (
               <div className="flex gap-3">
@@ -199,13 +213,18 @@ export default function NotificationsPage() {
             )}
 
             {selected.type === 'MESSAGE' && (
-              <button
-                type="button"
-                onClick={() => handleOpen(selected)}
-                className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm"
-              >
-                Mở cuộc trò chuyện
-              </button>
+              <div className="space-y-3">
+                <p className="text-sm text-on-surface bg-surface-container-low rounded-xl px-4 py-3">
+                  {selected.message}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleOpen(selected)}
+                  className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm"
+                >
+                  Mở cuộc trò chuyện
+                </button>
+              </div>
             )}
 
             {selected.type === 'CALL' && (
