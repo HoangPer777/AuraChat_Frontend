@@ -19,6 +19,27 @@ const api = axios.create({
   timeout: 30000,
 })
 
+const PUBLIC_AUTH_PATHS = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/verify-email',
+  '/auth/verify-forgot-password',
+  '/auth/resend-verification',
+  '/auth/firebase/login',
+  '/auth/forgot-password/status',
+]
+
+const isPublicAuthRequest = (url = '') =>
+  PUBLIC_AUTH_PATHS.some((path) => url.includes(path))
+
+const redirectToLogin = () => {
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login'
+  }
+}
+
 // Token refresh state management
 let isRefreshing = false
 let failedQueue = []
@@ -67,6 +88,11 @@ api.interceptors.response.use(
 
     // Only handle 401 errors that haven't been retried
     if (err.response?.status === 401 && !original._retry) {
+      // Login/register and other public auth calls may legitimately return 401
+      if (isPublicAuthRequest(original.url)) {
+        return Promise.reject(err)
+      }
+
       const refreshToken = localStorage.getItem('refreshToken')
 
       // No refresh token available - redirect to login
@@ -74,7 +100,7 @@ api.interceptors.response.use(
         localStorage.removeItem('accessToken')
         localStorage.removeItem('refreshToken')
         useAuthStore.getState().logout()
-        window.location.href = '/login'
+        redirectToLogin()
         return Promise.reject(err)
       }
 
@@ -127,7 +153,7 @@ api.interceptors.response.use(
         localStorage.removeItem('accessToken')
         localStorage.removeItem('refreshToken')
         useAuthStore.getState().logout()
-        window.location.href = '/login'
+        redirectToLogin()
         return Promise.reject(refreshErr)
       } finally {
         isRefreshing = false
