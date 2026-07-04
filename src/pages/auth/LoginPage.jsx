@@ -18,7 +18,13 @@ export default function LoginPage() {
   const [apiError, setApiError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  const { register, handleSubmit, watch, formState: { errors } } = useForm();
+  const emailValue = watch('email');
+
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
+  const [resendSuccess, setResendSuccess] = useState(null);
+  const [isResending, setIsResending] = useState(false);
 
   const redirectAfterLogin = (authenticatedUser) => {
     window.location.replace(authenticatedUser?.role === 'ADMIN' ? '/admin/dashboard' : '/chat');
@@ -71,6 +77,8 @@ export default function LoginPage() {
   // Email / password login
   const onSubmit = async (data) => {
     setApiError(null);
+    setResendSuccess(null);
+    setShowResendVerification(false);
     setIsLoading(true);
     try {
       const response = await api.post('/auth/login', {
@@ -88,12 +96,34 @@ export default function LoginPage() {
     } catch (err) {
       const errorCode = err.response?.data?.errorCode;
       if (errorCode === 'AUTH_007') {
-        setApiError('Email chưa được xác nhận. Vui lòng kiểm tra hộp thư hoặc gửi lại email xác nhận từ trang đăng ký.');
+        setUnverifiedEmail(data.email);
+        setShowResendVerification(true);
+        setApiError('Email chưa được xác nhận. Vui lòng kiểm tra hộp thư hoặc gửi lại link xác nhận bên dưới.');
       } else {
         setApiError(err.response?.data?.message || 'Đã có lỗi xảy ra. Vui lòng thử lại.');
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    const email = unverifiedEmail || emailValue;
+    if (!email) {
+      setApiError('Vui lòng nhập email trước khi gửi lại link xác nhận.');
+      return;
+    }
+
+    setIsResending(true);
+    setResendSuccess(null);
+    setApiError(null);
+    try {
+      await api.post('/auth/resend-verification', { email });
+      setResendSuccess(`Đã gửi lại link xác nhận đến ${email}. Vui lòng kiểm tra hộp thư.`);
+    } catch (err) {
+      setApiError(err.response?.data?.message || 'Không thể gửi lại email xác nhận. Vui lòng thử lại.');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -175,6 +205,24 @@ export default function LoginPage() {
             <div className="p-4 rounded-xl bg-error-container text-on-error-container text-sm font-medium">
               {apiError}
             </div>
+          )}
+
+          {resendSuccess && (
+            <div className="p-4 rounded-xl bg-green-100 text-green-800 text-sm font-medium">
+              {resendSuccess}
+            </div>
+          )}
+
+          {showResendVerification && (
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={isResending}
+              className={`w-full py-3 px-4 border border-primary text-primary font-body-bold rounded-xl hover:bg-primary-container/10 transition-all flex items-center justify-center gap-2 ${isResending ? 'opacity-70 cursor-not-allowed' : ''}`}
+            >
+              <span className="material-symbols-outlined text-[20px]">mail</span>
+              <span>{isResending ? 'Đang gửi...' : 'Gửi lại link xác nhận email'}</span>
+            </button>
           )}
 
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
