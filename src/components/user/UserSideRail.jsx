@@ -69,7 +69,7 @@ export default function UserSideRail() {
               </span>
             )}
           </div>
-          <SideNavButton to="/media" icon="perm_media" label="Media" />
+          <SideNavButton to="/media" icon="dynamic_feed" label="Bảng tin" />
         </nav>
       </div>
 

@@ -25,7 +25,7 @@ import AdminLayout from './components/admin/AdminLayout'
 import UserLayout from './components/user/UserLayout'
 import UserRealtimeSync from './components/user/UserRealtimeSync'
 import ProfilePageNew from './pages/chat/ProfilePage'
-import MediaLibraryPage from './pages/media/MediaLibraryPage'
+import MediaFeedPage from './pages/media/MediaFeedPage'
 
 // Error Boundary để bắt crash thay vì trang trắng
 class ErrorBoundary extends Component {
@@ -86,7 +86,7 @@ function App() {
                 <Route path="/friends" element={<FriendsPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="/create-group" element={<CreateGroupPage />} />
-                <Route path="/media" element={<MediaLibraryPage />} />
+                <Route path="/media" element={<MediaFeedPage />} />
                 <Route path="/profile" element={<ProfilePageNew />} />
                 <Route path="/users" element={<Navigate to="/friends" replace />} />
               </Route>

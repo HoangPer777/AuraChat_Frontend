@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 import api from '../../services/api';
 import PasswordInput from '../../components/forms/PasswordInput';
+import UserPostsSection from '../../components/post/UserPostsSection';
 
 function getProviderLabel(provider) {
   if (provider === 'GOOGLE') return 'Google Account';
@@ -275,14 +276,14 @@ export default function ProfilePage() {
         </div>
       )}
 
-      <main className="flex-1 min-h-0 flex items-center justify-center overflow-y-auto px-4 py-8 sm:px-8">
+      <main className="flex-1 min-h-0 overflow-y-auto px-4 py-8 sm:px-8">
         {isLoading ? (
           <div className="flex flex-col items-center gap-3 text-on-surface-variant">
             <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
             <p className="text-sm">Đang tải hồ sơ...</p>
           </div>
         ) : (
-          <div className="w-full max-w-lg">
+          <div className="w-full max-w-2xl mx-auto space-y-8">
             <div className="bg-white/80 backdrop-blur-md rounded-2xl border border-outline-variant/40 shadow-sm overflow-hidden">
               <header className="px-6 py-5 border-b border-outline-variant/50 text-center">
                 <h1 className="text-2xl font-bold">Hồ sơ của tôi</h1>
@@ -434,6 +435,8 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
+
+            <UserPostsSection userId={user?.id} title="Bài đăng của tôi" />
           </div>
         )}
       </main>
