@@ -6,6 +6,8 @@ import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
 import ResetPasswordPage from './pages/auth/ResetPasswordPage'
+import VerifyForgotPasswordPage from './pages/auth/VerifyForgotPasswordPage'
+import VerifyEmailPage from './pages/auth/VerifyEmailPage'
 import OAuth2CallbackPage from './pages/auth/OAuth2CallbackPage'
 import HomePage from './pages/chat/HomePage'
 import ChatWindowPage from './pages/chat/ChatWindowPage'
@@ -70,6 +72,8 @@ function App() {
           <Route path="/login" element={isAuthenticated ? <Navigate to="/chat" replace /> : <LoginPage />} />
           <Route path="/register" element={isAuthenticated ? <Navigate to="/chat" replace /> : <RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/verify-forgot-password" element={<VerifyForgotPasswordPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
           <Route path="/oauth/callback" element={<OAuth2CallbackPage />} />
 

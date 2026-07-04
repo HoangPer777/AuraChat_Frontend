@@ -86,7 +86,12 @@ export default function LoginPage() {
         setApiError(response.data?.message || 'Đăng nhập thất bại.');
       }
     } catch (err) {
-      setApiError(err.response?.data?.message || 'Đã có lỗi xảy ra. Vui lòng thử lại.');
+      const errorCode = err.response?.data?.errorCode;
+      if (errorCode === 'AUTH_007') {
+        setApiError('Email chưa được xác nhận. Vui lòng kiểm tra hộp thư hoặc gửi lại email xác nhận từ trang đăng ký.');
+      } else {
+        setApiError(err.response?.data?.message || 'Đã có lỗi xảy ra. Vui lòng thử lại.');
+      }
     } finally {
       setIsLoading(false);
     }
