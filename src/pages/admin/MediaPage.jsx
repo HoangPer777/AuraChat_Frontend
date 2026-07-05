@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { deleteAdminMedia, getAdminMedia, getAdminMediaStats } from '../../services/adminService'
+import { deleteAdminMedia, flagModerationMedia, getAdminMedia, getAdminMediaStats } from '../../services/adminService'
 import ConfirmModal from '../../components/modals/ConfirmModal'
 import Modal from '../../components/modals/Modal'
 import Toast from '../../components/notifications/Toast'
@@ -26,6 +26,8 @@ export default function MediaPage() {
   const [error, setError] = useState('')
   const [selected, setSelected] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [flagTarget, setFlagTarget] = useState(null)
+  const [flagNote, setFlagNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [toast, setToast] = useState(null)
 
@@ -64,6 +66,20 @@ export default function MediaPage() {
       await loadStats()
     } catch (err) {
       setToast({ type: 'error', message: err.response?.data?.message || 'Xóa media thất bại.' })
+    } finally { setSubmitting(false) }
+  }
+
+  const submitFlag = async (event) => {
+    event.preventDefault()
+    if (!flagTarget) return
+    setSubmitting(true)
+    try {
+      await flagModerationMedia(flagTarget.id, flagNote.trim() || undefined)
+      setFlagTarget(null)
+      setFlagNote('')
+      setToast({ type: 'success', message: 'Đã đưa media vào hàng đợi kiểm duyệt.' })
+    } catch (err) {
+      setToast({ type: 'error', message: err.response?.data?.message || 'Không thể đánh dấu media.' })
     } finally { setSubmitting(false) }
   }
 
@@ -144,6 +160,7 @@ export default function MediaPage() {
                   <p className="text-xs text-on-surface-variant">{formatBytes(item.size)} · {new Date(item.createdAt).toLocaleString('vi-VN')}</p>
                   <div className="flex gap-2 pt-1">
                     <button onClick={() => setSelected(item)} className="flex-1 px-3 py-1.5 text-sm border border-outline-variant rounded-lg hover:bg-surface-container-low">Chi tiết</button>
+                    <button onClick={() => setFlagTarget(item)} className="px-3 py-1.5 text-sm bg-amber-100 text-amber-800 rounded-lg" title="Đánh dấu nhạy cảm">Flag</button>
                     <button onClick={() => setConfirmDelete(item)} className="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg">Xóa</button>
                   </div>
                 </div>
@@ -195,6 +212,17 @@ export default function MediaPage() {
         loading={submitting}
         onConfirm={submitDelete}
       />
+
+      <Modal isOpen={!!flagTarget} onClose={() => setFlagTarget(null)} title="Đánh dấu media nhạy cảm">
+        <form onSubmit={submitFlag} className="space-y-4">
+          <p className="text-sm text-on-surface-variant">Media sẽ được đưa vào hàng đợi <strong>Nội dung nhạy cảm</strong> để kiểm duyệt.</p>
+          <textarea rows="3" maxLength="500" placeholder="Ghi chú (tuỳ chọn)..." className="w-full border rounded-lg px-3 py-2 text-sm" value={flagNote} onChange={(e) => setFlagNote(e.target.value)} />
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => setFlagTarget(null)} className="px-4 py-2 border rounded-lg">Hủy</button>
+            <button disabled={submitting} className="px-4 py-2 bg-amber-500 text-white rounded-lg font-bold disabled:opacity-50">Đánh dấu</button>
+          </div>
+        </form>
+      </Modal>
     </>
   )
 }

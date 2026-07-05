@@ -22,6 +22,7 @@ import DashboardPage from './pages/admin/DashboardPage'
 import UsersPage from './pages/admin/UsersPage'
 import PostsPage from './pages/admin/PostsPage'
 import MediaPage from './pages/admin/MediaPage'
+import ModerationPage from './pages/admin/ModerationPage'
 import BannedIpsPage from './pages/admin/BannedIpsPage'
 import AdminLayout from './components/admin/AdminLayout'
 import UserLayout from './components/user/UserLayout'
@@ -107,6 +108,7 @@ function App() {
               <Route path="/admin/users" element={<UsersPage />} />
               <Route path="/admin/posts" element={<PostsPage />} />
               <Route path="/admin/media" element={<MediaPage />} />
+              <Route path="/admin/moderation" element={<ModerationPage />} />
               <Route path="/admin/banned-ips" element={<BannedIpsPage />} />
             </Route>
           </Route>

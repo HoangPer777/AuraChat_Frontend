@@ -23,3 +23,13 @@ export const getAdminPost = async (id) => unwrap(await api.get(`/admin/posts/${i
 export const getAdminPostComments = async (id, params) => unwrap(await api.get(`/admin/posts/${id}/comments`, { params }))
 export const deleteAdminPost = async (id) => unwrap(await api.delete(`/admin/posts/${id}`))
 export const deleteAdminComment = async (commentId) => unwrap(await api.delete(`/admin/posts/comments/${commentId}`))
+
+export const getModerationFlags = async (params) => unwrap(await api.get('/admin/moderation/flags', { params }))
+export const getModerationStats = async () => unwrap(await api.get('/admin/moderation/flags/stats'))
+export const dismissModerationFlag = async (id, note) => unwrap(await api.post(`/admin/moderation/flags/${id}/dismiss`, note ? { note } : {}))
+export const removeModerationContent = async (id, note) => unwrap(await api.post(`/admin/moderation/flags/${id}/remove-content`, note ? { note } : {}))
+export const warnModerationUser = async (id, message) => unwrap(await api.post(`/admin/moderation/flags/${id}/warn-user`, { message }))
+export const flagModerationMedia = async (mediaId, note) => unwrap(await api.post(`/admin/moderation/media/${mediaId}/flag`, note ? { note } : {}))
+export const getModerationKeywords = async () => unwrap(await api.get('/admin/moderation/keywords'))
+export const addModerationKeyword = async (word) => unwrap(await api.post('/admin/moderation/keywords', { word }))
+export const deleteModerationKeyword = async (id) => unwrap(await api.delete(`/admin/moderation/keywords/${id}`))
