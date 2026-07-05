@@ -30,8 +30,8 @@ export const getComments = async (postId, params = { page: 0, size: 20 }) => {
   return response.data
 }
 
-export const addComment = async (postId, content) => {
-  const response = await api.post(`/posts/${postId}/comments`, { content })
+export const addComment = async (postId, content, parentCommentId = null) => {
+  const response = await api.post(`/posts/${postId}/comments`, { content, parentCommentId })
   return response.data
 }
 

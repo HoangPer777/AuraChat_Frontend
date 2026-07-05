@@ -14,6 +14,13 @@ import {
   publishCallOffer,
   publishIceCandidate,
 } from '../../services/callService'
+import {
+  CallAvatarStage,
+  CallBackgroundGlow,
+  CallControls,
+  CallSignalBadge,
+  CallTopBar,
+} from '../../components/call/CallUi'
 
 export default function VideoCallPage() {
   const navigate = useNavigate()
@@ -38,6 +45,7 @@ export default function VideoCallPage() {
   const [hasVideoTrack, setHasVideoTrack] = useState(true)
   const [localPreviewStream, setLocalPreviewStream] = useState(null)
   const [remotePreviewStream, setRemotePreviewStream] = useState(null)
+  const [remoteHasVideo, setRemoteHasVideo] = useState(false)
   const [callStatus, setCallStatus] = useState('connecting')
   const [statusText, setStatusText] = useState('Đang khởi tạo cuộc gọi...')
   const localVideoRef = useRef(null)
@@ -85,6 +93,34 @@ export default function VideoCallPage() {
     attachStreamToVideo(remoteVideoRef.current, remotePreviewStream)
 
     return undefined
+  }, [remotePreviewStream])
+
+  useEffect(() => {
+    if (!remotePreviewStream) {
+      setRemoteHasVideo(false)
+      return
+    }
+
+    const updateRemoteVideo = () => {
+      setRemoteHasVideo(
+        remotePreviewStream.getVideoTracks().some((track) => track.enabled && track.readyState === 'live')
+      )
+    }
+
+    updateRemoteVideo()
+    remotePreviewStream.getVideoTracks().forEach((track) => {
+      track.addEventListener('ended', updateRemoteVideo)
+      track.addEventListener('mute', updateRemoteVideo)
+      track.addEventListener('unmute', updateRemoteVideo)
+    })
+
+    return () => {
+      remotePreviewStream.getVideoTracks().forEach((track) => {
+        track.removeEventListener('ended', updateRemoteVideo)
+        track.removeEventListener('mute', updateRemoteVideo)
+        track.removeEventListener('unmute', updateRemoteVideo)
+      })
+    }
   }, [remotePreviewStream])
 
   useEffect(() => {
@@ -516,188 +552,90 @@ export default function VideoCallPage() {
   const isAudioCall = (callIntent?.type || 'VIDEO') === 'AUDIO'
   const remoteAvatar = callIntent?.receiverAvatar || callIntent?.callerAvatar
     || `https://ui-avatars.com/api/?name=${encodeURIComponent(remoteName)}`
+  const callTypeLabel = isAudioCall ? 'Cuộc gọi thoại' : 'Cuộc gọi video'
+  const showRemoteVideo = !isAudioCall && remoteHasVideo
+  const showAvatarStage = isAudioCall || !showRemoteVideo
 
   if (!callIntent) {
     return null
   }
 
-  if (isAudioCall) {
-    return (
-      <div className="bg-[#121218] font-sans text-white min-h-screen flex items-center justify-center p-4 relative">
-        <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
-
-        <div className="w-full max-w-[400px] h-[min(640px,90vh)] bg-gradient-to-br from-[#1e1e2e] to-[#121218] rounded-[40px] shadow-2xl border border-white/5 flex flex-col items-center justify-between p-10 relative overflow-hidden">
-          <div className="absolute top-[-10%] left-[-10%] w-[300px] h-[300px] bg-primary/20 rounded-full blur-[100px] animate-pulse" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[300px] h-[300px] bg-secondary/20 rounded-full blur-[100px] animate-pulse" />
-
-          <div className="w-full flex justify-between items-center z-10">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold tracking-widest text-primary uppercase">Cuộc gọi thoại</span>
-              {callStatus === 'connected' && (
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              )}
-            </div>
-            <span className="text-xs font-bold text-primary-fixed-dim tracking-widest">{formatTime(timer)}</span>
-          </div>
-
-          <div className="flex flex-col items-center z-10">
-            <div className="relative mb-8">
-              {callStatus === 'ringing' && (
-                <div className="absolute inset-[-15px] border border-primary/20 rounded-full animate-ping opacity-20" />
-              )}
-              <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-primary to-secondary shadow-2xl shadow-primary/20">
-                <img
-                  src={remoteAvatar}
-                  className="w-full h-full rounded-full object-cover border-4 border-[#1e1e2e]"
-                  alt={remoteName}
-                />
-              </div>
-            </div>
-            <h2 className="text-2xl font-bold tracking-tight text-center">{remoteName}</h2>
-            <p className="text-white/50 text-sm mt-2">{statusText}</p>
-          </div>
-
-          <div className="flex items-center gap-1.5 h-12 w-full justify-center z-10">
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-              <div
-                key={i}
-                className={`w-1 rounded-full transition-all ${callStatus === 'connected' ? 'bg-primary/60 animate-pulse' : 'bg-primary/20'}`}
-                style={{ height: `${20 + (i % 4) * 12}%`, animationDelay: `${i * 0.08}s` }}
-              />
-            ))}
-          </div>
-
-          <div className="w-full bg-white/5 backdrop-blur-2xl rounded-[32px] p-6 flex items-center justify-center gap-6 z-10 border border-white/10">
-            <button
-              type="button"
-              onClick={() => {
-                const next = !isMicOn
-                setIsMicOn(next)
-                toggleTrack('audio', next)
-              }}
-              className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500 hover:bg-red-600'}`}
-            >
-              <span className="material-symbols-outlined">{isMicOn ? 'mic' : 'mic_off'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleEndCall}
-              className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white shadow-xl shadow-red-500/20 hover:scale-105 active:scale-95 transition-all"
-            >
-              <span className="material-symbols-outlined text-[32px]">call_end</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="bg-[#0f0f13] h-screen w-screen overflow-hidden text-white font-sans relative">
-      {/* Remote Video (Background) */}
-      <div className="absolute inset-0 z-0">
-        <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover opacity-80 bg-black" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80"></div>
-      </div>
+      <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
 
-      {/* Top Header */}
-      <header className="absolute top-0 left-0 w-full pt-12 flex flex-col items-center z-20">
-        <div className="bg-white/10 backdrop-blur-2xl px-6 py-2.5 rounded-full border border-white/10 flex items-center gap-4 shadow-2xl">
-          <div className="flex flex-col items-center">
-             <h1 className="text-sm font-bold tracking-tight">{remoteName}</h1>
-             <span className="text-[10px] font-bold text-primary-fixed-dim tracking-[0.2em]">{formatTime(timer)}</span>
+      {showRemoteVideo ? (
+        <div className="absolute inset-0 z-0">
+          <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover opacity-90 bg-black" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80" />
+        </div>
+      ) : (
+        <div className="absolute inset-0 z-0 bg-gradient-to-br from-[#1e1e2e] to-[#0f0f13]">
+          <CallBackgroundGlow />
+        </div>
+      )}
+
+      <CallTopBar
+        remoteName={remoteName}
+        timer={formatTime(timer)}
+        statusLabel={callTypeLabel}
+        isConnected={callStatus === 'connected'}
+      />
+
+      {showAvatarStage && (
+        <CallAvatarStage
+          remoteName={remoteName}
+          remoteAvatar={remoteAvatar}
+          statusText={statusText}
+          isRinging={callStatus === 'ringing'}
+          isConnected={callStatus === 'connected' && isAudioCall}
+        />
+      )}
+
+      {!isAudioCall && (
+        <div className="absolute bottom-32 right-4 sm:right-8 z-30 w-36 sm:w-48 aspect-[4/3] rounded-3xl overflow-hidden border-2 border-white/20 shadow-2xl transition-transform hover:scale-105 bg-[#1e1e2e]">
+          {isCamOn && hasVideoTrack ? (
+            <video
+              ref={localVideoRef}
+              autoPlay
+              muted
+              playsInline
+              className="w-full h-full object-cover scale-x-[-1]"
+            />
+          ) : (
+            <div className="w-full h-full bg-[#1e1e2e] flex items-center justify-center">
+              <span className="material-symbols-outlined text-4xl text-white/20">videocam_off</span>
+            </div>
+          )}
+          <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-black/40 px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-widest backdrop-blur-md">
+            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+            {localLabel}
           </div>
         </div>
-      </header>
+      )}
 
-      {/* Picture in Picture (Self View) */}
-      <div className="absolute bottom-32 right-8 z-30 w-48 aspect-[4/3] rounded-3xl overflow-hidden border-2 border-white/20 shadow-2xl group transition-transform hover:scale-105 bg-[#1e1e2e]">
-        {isCamOn && hasVideoTrack ? (
-          <video
-            ref={localVideoRef}
-            autoPlay
-            muted
-            playsInline
-            className="w-full h-full object-cover scale-x-[-1]"
-          />
-        ) : (
-          <div className="w-full h-full bg-[#1e1e2e] flex items-center justify-center">
-            <span className="material-symbols-outlined text-4xl text-white/20">videocam_off</span>
-          </div>
-        )}
-        <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-black/40 px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-widest backdrop-blur-md">
-          <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-          {localLabel}
-        </div>
-      </div>
+      <CallSignalBadge callStatus={callStatus} statusText={statusText} />
 
-      {/* Side Toolbar */}
-      <div className="absolute right-8 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-20">
-         {[
-           { icon: 'chat', label: 'Chat' },
-           { icon: 'group', label: 'People' },
-           { icon: 'settings', label: 'Settings' }
-         ].map(item => (
-           <button key={item.icon} className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 flex items-center justify-center hover:bg-white/20 transition-all group relative">
-             <span className="material-symbols-outlined text-[22px] text-white/70 group-hover:text-white">{item.icon}</span>
-             <span className="absolute right-14 bg-black/80 text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">{item.label}</span>
-           </button>
-         ))}
-      </div>
-
-      {/* Control Bar */}
-      <div className="absolute bottom-10 left-0 w-full flex justify-center z-40 px-6">
-        <div className="bg-white/10 backdrop-blur-3xl rounded-[32px] p-4 flex items-center gap-4 border border-white/10 shadow-2xl">
-          <button
-            onClick={() => {
-              const next = !isMicOn
-              setIsMicOn(next)
-              toggleTrack('audio', next)
-            }}
-            className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${isMicOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500 hover:bg-red-600'}`}
-          >
-            <span className="material-symbols-outlined">{isMicOn ? 'mic' : 'mic_off'}</span>
-          </button>
-          
-          <button
-            onClick={() => {
-              const next = !isCamOn
-              setIsCamOn(next)
-              toggleTrack('video', next)
-            }}
-            className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${isCamOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500 hover:bg-red-600'}`}
-          >
-            <span className="material-symbols-outlined">{isCamOn ? 'videocam' : 'videocam_off'}</span>
-          </button>
-
-          <button className="w-14 h-14 rounded-2xl bg-white text-primary flex items-center justify-center hover:bg-white/90 transition-all shadow-lg">
-            <span className="material-symbols-outlined">screen_share</span>
-          </button>
-
-          <button className="w-14 h-14 rounded-2xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
-            <span className="material-symbols-outlined">more_horiz</span>
-          </button>
-
-          <div className="w-[1px] h-10 bg-white/10 mx-2"></div>
-
-          <button
-            onClick={handleEndCall}
-            className="h-14 px-10 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm flex items-center gap-3 transition-all shadow-xl shadow-red-500/20 active:scale-95"
-          >
-            <span className="material-symbols-outlined">call_end</span>
-            <span>Kết thúc</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Signal Info */}
-      <div className="absolute bottom-10 left-8 flex items-center gap-3 bg-white/5 px-5 py-3 rounded-2xl border border-white/10 backdrop-blur-xl">
-        <span className="material-symbols-outlined text-green-500">signal_cellular_alt</span>
-        <div className="flex flex-col">
-           <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest leading-none">{callStatus === 'connected' ? 'HD Quality' : 'Kết nối cuộc gọi'}</span>
-           <span className="text-[9px] font-medium text-white/30 mt-1">{statusText}</span>
-        </div>
-      </div>
+      <CallControls
+        isMicOn={isMicOn}
+        isCamOn={isCamOn}
+        showCamera={!isAudioCall}
+        showScreenShare={!isAudioCall}
+        onToggleMic={() => {
+          const next = !isMicOn
+          setIsMicOn(next)
+          toggleTrack('audio', next)
+        }}
+        onToggleCam={() => {
+          const next = !isCamOn
+          setIsCamOn(next)
+          toggleTrack('video', next)
+          if (next && localStreamRef.current && hasVideoTrack) {
+            setLocalPreviewStream(localStreamRef.current)
+          }
+        }}
+        onEndCall={handleEndCall}
+      />
     </div>
   )
 }

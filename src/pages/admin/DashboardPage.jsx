@@ -42,7 +42,18 @@ export default function DashboardPage() {
     { label: 'Người dùng mới', value: stats?.newUsersCount, icon: 'person_add', color: 'text-secondary' },
     { label: 'Tin nhắn', value: stats?.messageVolume, icon: 'chat', color: 'text-tertiary' },
     { label: 'Hoạt động (DAU)', value: stats?.dailyActiveUsers, icon: 'monitoring', color: 'text-primary' },
+    { label: 'Bài đăng', value: stats?.totalPostsCount, icon: 'article', color: 'text-secondary' },
+    { label: 'Media', value: stats?.totalMediaCount, icon: 'perm_media', color: 'text-tertiary' },
   ]
+
+  const formatBytes = (bytes) => {
+    if (!bytes) return '0 B'
+    const units = ['B', 'KB', 'MB', 'GB']
+    let value = bytes
+    let i = 0
+    while (value >= 1024 && i < units.length - 1) { value /= 1024; i += 1 }
+    return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
+  }
 
   return (
     <>
@@ -71,7 +82,7 @@ export default function DashboardPage() {
 
         {error && <div className="mb-6 p-4 rounded-xl bg-red-50 text-red-700 flex justify-between"><span>{error}</span><button onClick={loadStats} className="font-bold">Thử lại</button></div>}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
           {cards.map((card) => (
             <div key={card.label} className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/30 shadow-sm">
               <div className="flex justify-between items-start mb-3">
@@ -85,7 +96,12 @@ export default function DashboardPage() {
 
         <div className="mt-8 bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant/30 shadow-sm">
           <h3 className="font-bold text-lg mb-2">Cách tính số liệu</h3>
-          <p className="text-sm text-on-surface-variant">DAU là số người dùng khác nhau đã gửi ít nhất một tin nhắn trong khoảng ngày đã chọn. Số online được lấy từ heartbeat còn hiệu lực trong Redis.</p>
+          <p className="text-sm text-on-surface-variant">
+            DAU là số người dùng khác nhau đã gửi ít nhất một tin nhắn trong khoảng ngày đã chọn.
+            Số online được lấy từ heartbeat còn hiệu lực trong Redis.
+            Bài đăng và media là tổng số đang hoạt động trên toàn hệ thống
+            {stats?.totalMediaBytes ? ` (${formatBytes(stats.totalMediaBytes)} dung lượng media)` : ''}.
+          </p>
         </div>
       </div>
     </>

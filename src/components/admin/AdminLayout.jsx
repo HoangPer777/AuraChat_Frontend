@@ -4,6 +4,8 @@ import useAuthStore from '../../store/authStore'
 const navItems = [
   { to: '/admin/dashboard', icon: 'dashboard', label: 'Tổng quan' },
   { to: '/admin/users', icon: 'group', label: 'Quản lý người dùng' },
+  { to: '/admin/posts', icon: 'article', label: 'Quản lý bài đăng' },
+  { to: '/admin/media', icon: 'perm_media', label: 'Quản lý media' },
   { to: '/admin/banned-ips', icon: 'gpp_bad', label: 'IP bị chặn' },
 ]
 

@@ -58,14 +58,102 @@ function SharedPostPreview({ originalPost }) {
   )
 }
 
+function CommentBubble({ comment, isOwner, replyingToId, replyText, onReplyTextChange, onStartReply, onCancelReply, onSubmitReply, submittingReply }) {
+  const isReplying = replyingToId === comment.id
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <AuthorAvatar author={comment.author} size={8} />
+        <div className="flex-1 min-w-0">
+          <div className="bg-white rounded-xl px-3 py-2 border border-outline-variant/30">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-xs font-bold">{comment.author?.displayName}</p>
+              {comment.postAuthor && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary">Tác giả</span>
+              )}
+            </div>
+            <p className="text-sm mt-0.5 whitespace-pre-wrap">{comment.content}</p>
+          </div>
+          <div className="flex items-center gap-3 mt-1 ml-1">
+            <span className="text-[10px] text-on-surface-variant">{formatTime(comment.createdAt)}</span>
+            {isOwner && !comment.parentCommentId && (
+              <button
+                type="button"
+                onClick={() => (isReplying ? onCancelReply() : onStartReply(comment))}
+                className="text-[10px] font-bold text-primary hover:underline"
+              >
+                {isReplying ? 'Huỷ' : 'Trả lời'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {comment.replies?.length > 0 && (
+        <div className="ml-8 space-y-2 border-l-2 border-primary/20 pl-3">
+          {comment.replies.map((reply) => (
+            <div key={reply.id} className="flex gap-2">
+              <AuthorAvatar author={reply.author} size={7} />
+              <div className="flex-1 min-w-0">
+                <div className="bg-white rounded-xl px-3 py-2 border border-outline-variant/30">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-xs font-bold">{reply.author?.displayName}</p>
+                    {reply.postAuthor && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary">Tác giả</span>
+                    )}
+                  </div>
+                  {reply.replyTo && (
+                    <p className="text-[10px] text-on-surface-variant mt-0.5">
+                      Trả lời <span className="font-semibold text-primary">{reply.replyTo.displayName}</span>
+                    </p>
+                  )}
+                  <p className="text-sm mt-0.5 whitespace-pre-wrap">{reply.content}</p>
+                </div>
+                <span className="text-[10px] text-on-surface-variant mt-1 ml-1 inline-block">
+                  {formatTime(reply.createdAt)}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isReplying && (
+        <div className="ml-8 flex gap-2">
+          <input
+            value={replyText}
+            onChange={(e) => onReplyTextChange(e.target.value)}
+            placeholder={`Trả lời ${comment.author?.displayName}...`}
+            className="flex-1 px-3 py-2 rounded-xl border border-outline-variant text-sm outline-none focus:ring-2 focus:ring-primary/20"
+            onKeyDown={(e) => e.key === 'Enter' && onSubmitReply(comment.id)}
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={() => onSubmitReply(comment.id)}
+            disabled={submittingReply}
+            className="px-3 py-2 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-50"
+          >
+            Gửi
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function PostCard({ post, onUpdate, onDelete, onShare, showActions = true }) {
   const currentUser = useAuthStore((s) => s.user)
   const [localPost, setLocalPost] = useState(post)
   const [showComments, setShowComments] = useState(false)
   const [comments, setComments] = useState([])
   const [commentText, setCommentText] = useState('')
+  const [replyingToId, setReplyingToId] = useState(null)
+  const [replyText, setReplyText] = useState('')
   const [loadingComments, setLoadingComments] = useState(false)
   const [submittingComment, setSubmittingComment] = useState(false)
+  const [submittingReply, setSubmittingReply] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [actionError, setActionError] = useState('')
 
@@ -143,7 +231,7 @@ export default function PostCard({ post, onUpdate, onDelete, onShare, showAction
       const res = await addComment(localPost.id, commentText.trim())
       const newComment = res?.data
       if (newComment) {
-        setComments((prev) => [...prev, newComment])
+        setComments((prev) => [...prev, { ...newComment, replies: newComment.replies || [] }])
         setCommentText('')
         setLocalPost((prev) => ({
           ...prev,
@@ -154,6 +242,34 @@ export default function PostCard({ post, onUpdate, onDelete, onShare, showAction
       setActionError(err.response?.data?.message || 'Không thể bình luận')
     } finally {
       setSubmittingComment(false)
+    }
+  }
+
+  const handleSubmitReply = async (parentCommentId) => {
+    if (!replyText.trim()) return
+    setSubmittingReply(true)
+    try {
+      const res = await addComment(localPost.id, replyText.trim(), parentCommentId)
+      const newReply = res?.data
+      if (newReply) {
+        setComments((prev) =>
+          prev.map((comment) =>
+            comment.id === parentCommentId
+              ? { ...comment, replies: [...(comment.replies || []), newReply] }
+              : comment
+          )
+        )
+        setReplyText('')
+        setReplyingToId(null)
+        setLocalPost((prev) => ({
+          ...prev,
+          commentCount: (prev.commentCount || 0) + 1,
+        }))
+      }
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Không thể trả lời bình luận')
+    } finally {
+      setSubmittingReply(false)
     }
   }
 
@@ -242,20 +358,36 @@ export default function PostCard({ post, onUpdate, onDelete, onShare, showAction
           {loadingComments ? (
             <p className="py-3 text-sm text-on-surface-variant">Đang tải bình luận...</p>
           ) : (
-            <div className="space-y-3 py-3 max-h-64 overflow-y-auto">
+            <div className="space-y-3 py-3 max-h-80 overflow-y-auto">
               {comments.length === 0 && (
                 <p className="text-sm text-on-surface-variant">Chưa có bình luận nào.</p>
               )}
               {comments.map((comment) => (
-                <div key={comment.id} className="flex gap-2">
-                  <AuthorAvatar author={comment.author} size={8} />
-                  <div className="bg-white rounded-xl px-3 py-2 flex-1 border border-outline-variant/30">
-                    <p className="text-xs font-bold">{comment.author?.displayName}</p>
-                    <p className="text-sm mt-0.5">{comment.content}</p>
-                  </div>
-                </div>
+                <CommentBubble
+                  key={comment.id}
+                  comment={comment}
+                  isOwner={isOwner}
+                  replyingToId={replyingToId}
+                  replyText={replyText}
+                  onReplyTextChange={setReplyText}
+                  onStartReply={(c) => {
+                    setReplyingToId(c.id)
+                    setReplyText('')
+                  }}
+                  onCancelReply={() => {
+                    setReplyingToId(null)
+                    setReplyText('')
+                  }}
+                  onSubmitReply={handleSubmitReply}
+                  submittingReply={submittingReply}
+                />
               ))}
             </div>
+          )}
+          {!isOwner && (
+            <p className="text-[11px] text-on-surface-variant pb-2">
+              Chủ bài đăng có thể trả lời bình luận của bạn.
+            </p>
           )}
           <div className="flex gap-2">
             <input

@@ -20,6 +20,8 @@ import VideoCallPage from './pages/call/VideoCallPage'
 import GroupCallPage from './pages/call/GroupCallPage'
 import DashboardPage from './pages/admin/DashboardPage'
 import UsersPage from './pages/admin/UsersPage'
+import PostsPage from './pages/admin/PostsPage'
+import MediaPage from './pages/admin/MediaPage'
 import BannedIpsPage from './pages/admin/BannedIpsPage'
 import AdminLayout from './components/admin/AdminLayout'
 import UserLayout from './components/user/UserLayout'
@@ -103,6 +105,8 @@ function App() {
             <Route element={<AdminLayout />}>
               <Route path="/admin/dashboard" element={<DashboardPage />} />
               <Route path="/admin/users" element={<UsersPage />} />
+              <Route path="/admin/posts" element={<PostsPage />} />
+              <Route path="/admin/media" element={<MediaPage />} />
               <Route path="/admin/banned-ips" element={<BannedIpsPage />} />
             </Route>
           </Route>

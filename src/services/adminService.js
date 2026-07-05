@@ -12,3 +12,14 @@ export const getAdminStatistics = async (params) => unwrap(await api.get('/admin
 export const getBannedIps = async (params) => unwrap(await api.get('/admin/banned-ips', { params }))
 export const banIp = async (payload) => unwrap(await api.post('/admin/ban-ip', payload))
 export const unbanIp = async (ipAddress) => unwrap(await api.delete(`/admin/ban-ip/${encodeURIComponent(ipAddress)}`))
+
+export const getAdminMedia = async (params) => unwrap(await api.get('/admin/media', { params }))
+export const getAdminMediaStats = async () => unwrap(await api.get('/admin/media/stats'))
+export const getAdminMediaDetail = async (id) => unwrap(await api.get(`/admin/media/${id}`))
+export const deleteAdminMedia = async (id) => unwrap(await api.delete(`/admin/media/${id}`))
+
+export const getAdminPosts = async (params) => unwrap(await api.get('/admin/posts', { params }))
+export const getAdminPost = async (id) => unwrap(await api.get(`/admin/posts/${id}`))
+export const getAdminPostComments = async (id, params) => unwrap(await api.get(`/admin/posts/${id}/comments`, { params }))
+export const deleteAdminPost = async (id) => unwrap(await api.delete(`/admin/posts/${id}`))
+export const deleteAdminComment = async (commentId) => unwrap(await api.delete(`/admin/posts/comments/${commentId}`))
