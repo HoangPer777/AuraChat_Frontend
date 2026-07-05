@@ -1,3 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    @apply antialiased text-on-surface bg-background;
+  }
+
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    vertical-align: middle;
+    user-select: none;
+  }
+}
+
+@layer components {
+  .bg-custom-gradient {
+    background: linear-gradient(135deg, #f3e8ff 0%, #faf5ff 100%);
+  }
+
+  .primary-gradient {
+    background: linear-gradient(135deg, #630ed4 0%, #7c3aed 50%, #8127cf 100%);
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .glass-card-solid {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+  }
+
+  .btn-primary-gradient {
+    background: linear-gradient(90deg, #7c3aed 0%, #a855f7 100%);
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* Admin dashboard date picker (react-day-picker) */
 .admin-date-picker {
   --rdp-accent-color: #6750A4;
   --rdp-accent-background-color: #EADDFF;
