@@ -9,6 +9,7 @@ export const deactivateUser = async (id) => unwrap(await api.post(`/admin/users/
 export const activateUser = async (id) => unwrap(await api.post(`/admin/users/${id}/activate`))
 export const terminateUser = async (id) => unwrap(await api.post(`/admin/users/${id}/terminate`))
 export const getAdminStatistics = async (params) => unwrap(await api.get('/admin/statistics', { params }))
+export const getAdminStatisticsTrends = async (params) => unwrap(await api.get('/admin/statistics/trends', { params }))
 export const getBannedIps = async (params) => unwrap(await api.get('/admin/banned-ips', { params }))
 export const banIp = async (payload) => unwrap(await api.post('/admin/ban-ip', payload))
 export const unbanIp = async (ipAddress) => unwrap(await api.delete(`/admin/ban-ip/${encodeURIComponent(ipAddress)}`))

@@ -13,11 +13,14 @@
   "dependencies": {
     "@stomp/stompjs": "^7.0.0",
     "axios": "^1.7.2",
+    "date-fns": "^4.4.0",
     "firebase": "^12.12.1",
     "react": "^18.3.1",
+    "react-day-picker": "^10.0.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.75.0",
     "react-router-dom": "^6.23.1",
+    "recharts": "^3.9.2",
     "simple-peer": "^9.11.1",
     "sockjs-client": "^1.6.1",
     "zustand": "^4.5.2"
