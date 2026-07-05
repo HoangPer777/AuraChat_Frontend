@@ -30,23 +30,30 @@ const CHART_COLORS = {
 
 const formatChartDate = (isoDate) => {
   if (!isoDate) return ''
-  try {
-    return format(parseISO(isoDate), 'dd/MM', { locale: vi })
-  } catch {
-    const [, month, day] = isoDate.split('-')
-    return `${day}/${month}`
+  const parts = isoDate.split('-').map(Number)
+  if (parts.length === 3) {
+    const [, month, day] = parts
+    return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}`
   }
+  return isoDate
+}
+
+const parseLocalDate = (value) => {
+  if (!value) return null
+  const parts = value.split('-').map(Number)
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return null
+  const [year, month, day] = parts
+  return new Date(year, month - 1, day)
 }
 
 const formatRangeLabel = (startDate, endDate) => {
   if (!startDate || !endDate) return 'khoảng đã chọn'
-  try {
-    const start = format(parseISO(startDate), 'dd/MM/yyyy', { locale: vi })
-    const end = format(parseISO(endDate), 'dd/MM/yyyy', { locale: vi })
-    return start === end ? start : `${start} – ${end}`
-  } catch {
-    return `${startDate} – ${endDate}`
-  }
+  const start = parseLocalDate(startDate)
+  const end = parseLocalDate(endDate)
+  if (!start || !end) return `${startDate} – ${endDate}`
+  const startLabel = format(start, 'dd/MM/yyyy', { locale: vi })
+  const endLabel = format(end, 'dd/MM/yyyy', { locale: vi })
+  return startLabel === endLabel ? startLabel : `${startLabel} – ${endLabel}`
 }
 
 const formatBytes = (bytes) => {
@@ -61,8 +68,9 @@ const formatBytes = (bytes) => {
 const ChartTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null
   const point = payload[0]?.payload
-  const dateLabel = point?.date
-    ? format(parseISO(point.date), 'dd/MM/yyyy', { locale: vi })
+  const parsed = point?.date ? parseLocalDate(point.date) : null
+  const dateLabel = parsed
+    ? format(parsed, 'dd/MM/yyyy', { locale: vi })
     : point?.label
   return (
     <div className="bg-surface-container-lowest border border-outline-variant rounded-xl px-3 py-2 shadow-lg text-sm">
@@ -160,7 +168,7 @@ export default function DashboardPage() {
         </div>
       </header>
       <div className="p-8">
-        <div className="flex flex-wrap justify-between items-end gap-4 mb-8">
+        <div className="flex flex-wrap justify-between items-end gap-4 mb-8 overflow-visible relative z-10">
           <div>
             <h2 className="text-2xl font-bold">Thống kê hệ thống</h2>
             <p className="text-sm text-on-surface-variant">

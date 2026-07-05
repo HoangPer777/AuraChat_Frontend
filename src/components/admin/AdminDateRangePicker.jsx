@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { DayPicker } from 'react-day-picker'
 import { vi } from 'date-fns/locale'
-import { format, isAfter, isBefore, parseISO, startOfDay, subDays } from 'date-fns'
+import { format, isAfter, startOfDay, subDays } from 'date-fns'
 import 'react-day-picker/style.css'
 
 const presets = [
@@ -12,50 +13,94 @@ const presets = [
 
 const toIsoDate = (date) => format(date, 'yyyy-MM-dd')
 
-const parseDate = (value) => {
+/** Parse yyyy-MM-dd as local date (tránh lệch timezone của parseISO). */
+const parseLocalDate = (value) => {
   if (!value) return undefined
-  const parsed = parseISO(value)
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return undefined
+  const [, y, m, d] = match.map(Number)
+  const date = new Date(y, m - 1, d)
+  return Number.isNaN(date.getTime()) ? undefined : startOfDay(date)
 }
 
 export default function AdminDateRangePicker({ startDate, endDate, presetDays, onChange }) {
   const [open, setOpen] = useState(false)
   const [draftRange, setDraftRange] = useState(undefined)
   const [activePreset, setActivePreset] = useState('week')
+  const [panelStyle, setPanelStyle] = useState({ top: 0, left: 0, width: 340 })
   const containerRef = useRef(null)
+  const toggleRef = useRef(null)
+  const panelRef = useRef(null)
+  const wasOpenRef = useRef(false)
 
-  const selectedFrom = parseDate(startDate)
-  const selectedTo = parseDate(endDate)
+  const selectedFrom = parseLocalDate(startDate)
+  const selectedTo = parseLocalDate(endDate)
   const today = startOfDay(new Date())
   const maxStart = subDays(today, 365)
 
+  // Chỉ khởi tạo draft khi mở popup — không reset khi user đang chọn ngày.
   useEffect(() => {
-    if (open) {
-      setDraftRange(
-        selectedFrom && selectedTo
-          ? { from: selectedFrom, to: selectedTo }
-          : selectedFrom
-            ? { from: selectedFrom, to: selectedFrom }
-            : undefined
-      )
+    if (open && !wasOpenRef.current) {
+      const from = parseLocalDate(startDate)
+      const to = parseLocalDate(endDate)
+      if (from && to) {
+        setDraftRange({ from, to })
+      } else if (from) {
+        setDraftRange({ from, to: undefined })
+      } else {
+        setDraftRange(undefined)
+      }
     }
-  }, [open, startDate, endDate, selectedFrom, selectedTo])
+    wasOpenRef.current = open
+  }, [open, startDate, endDate])
 
   useEffect(() => {
     const preset = presets.find((p) => p.days === presetDays)
-    if (preset) setActivePreset(preset.id)
-    else setActivePreset('custom')
+    setActivePreset(preset ? preset.id : 'custom')
   }, [presetDays])
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
-        setOpen(false)
-      }
+  useLayoutEffect(() => {
+    if (!open || !toggleRef.current) return undefined
+
+    const updatePosition = () => {
+      const rect = toggleRef.current.getBoundingClientRect()
+      const panelWidth = Math.min(360, window.innerWidth - 16)
+      let left = rect.right - panelWidth
+      left = Math.max(8, Math.min(left, window.innerWidth - panelWidth - 8))
+      const top = rect.bottom + 8
+      setPanelStyle({ top, left, width: panelWidth })
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    const handlePointerDown = (event) => {
+      const target = event.target
+      if (containerRef.current?.contains(target)) return
+      if (panelRef.current?.contains(target)) return
+      setOpen(false)
+    }
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [open])
 
   const applyPreset = (preset) => {
     const end = today
@@ -67,8 +112,8 @@ export default function AdminDateRangePicker({ startDate, endDate, presetDays, o
 
   const applyCustomRange = () => {
     if (!draftRange?.from) return
-    const from = draftRange.from
-    const to = draftRange.to || draftRange.from
+    const from = startOfDay(draftRange.from)
+    const to = startOfDay(draftRange.to || draftRange.from)
     if (isAfter(from, to)) return
 
     setActivePreset('custom')
@@ -80,7 +125,57 @@ export default function AdminDateRangePicker({ startDate, endDate, presetDays, o
     ? `${format(selectedFrom, 'dd/MM/yyyy', { locale: vi })} – ${format(selectedTo, 'dd/MM/yyyy', { locale: vi })}`
     : 'Chọn khoảng thời gian'
 
-  const disabledDays = (date) => isAfter(date, today) || isBefore(date, maxStart)
+  const calendarPanel = open ? (
+    <div
+      ref={panelRef}
+      className="admin-date-picker fixed z-[9999] bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-2xl p-4"
+      style={{ top: panelStyle.top, left: panelStyle.left, width: panelStyle.width }}
+      role="dialog"
+      aria-label="Chọn khoảng ngày"
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <p className="text-sm font-bold mb-3 text-on-surface">Chọn từ ngày đến ngày</p>
+      <div className="flex justify-center overflow-x-auto">
+        <DayPicker
+          mode="range"
+          locale={vi}
+          selected={draftRange}
+          onSelect={setDraftRange}
+          resetOnSelect
+          disabled={{ after: today, before: maxStart }}
+          defaultMonth={draftRange?.from || selectedFrom || today}
+          showOutsideDays
+          fixedWeeks
+        />
+      </div>
+      <div className="mt-3 pt-3 border-t border-outline-variant space-y-3">
+        <p className="text-xs text-on-surface-variant">
+          {draftRange?.from
+            ? draftRange.to
+              ? `${format(draftRange.from, 'dd/MM/yyyy')} → ${format(draftRange.to, 'dd/MM/yyyy')}`
+              : `Từ ${format(draftRange.from, 'dd/MM/yyyy')} — chọn ngày kết thúc`
+            : 'Bước 1: chọn ngày bắt đầu · Bước 2: chọn ngày kết thúc'}
+        </p>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="px-3 py-1.5 text-sm border border-outline-variant rounded-lg hover:bg-surface-container-low"
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            onClick={applyCustomRange}
+            disabled={!draftRange?.from}
+            className="px-3 py-1.5 text-sm bg-primary text-white rounded-lg font-bold disabled:opacity-40"
+          >
+            Áp dụng
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null
 
   return (
     <div ref={containerRef} className="relative">
@@ -103,6 +198,7 @@ export default function AdminDateRangePicker({ startDate, endDate, presetDays, o
         </div>
 
         <button
+          ref={toggleRef}
           type="button"
           onClick={() => setOpen((v) => !v)}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm transition-all ${
@@ -112,63 +208,12 @@ export default function AdminDateRangePicker({ startDate, endDate, presetDays, o
           }`}
         >
           <span className="material-symbols-outlined text-[18px]">calendar_month</span>
-          <span className="max-w-[220px] truncate">{displayLabel}</span>
+          <span className="max-w-[240px] truncate">{displayLabel}</span>
           <span className="material-symbols-outlined text-[18px]">{open ? 'expand_less' : 'expand_more'}</span>
         </button>
       </div>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-2 z-50 bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl p-4 min-w-[320px] admin-date-picker">
-          <p className="text-sm font-bold mb-3 text-on-surface">Chọn từ ngày đến ngày</p>
-          <DayPicker
-            mode="range"
-            locale={vi}
-            selected={draftRange}
-            onSelect={setDraftRange}
-            disabled={disabledDays}
-            numberOfMonths={1}
-            defaultMonth={draftRange?.from || selectedFrom || today}
-            classNames={{
-              root: 'rdp-root text-sm',
-              month_caption: 'font-bold text-on-surface mb-2 capitalize',
-              weekday: 'text-on-surface-variant text-xs font-medium',
-              day: 'rounded-lg',
-              selected: 'bg-primary text-white font-bold',
-              range_start: 'bg-primary text-white rounded-l-lg',
-              range_end: 'bg-primary text-white rounded-r-lg',
-              range_middle: 'bg-primary-container text-on-primary-container',
-              today: 'font-bold text-primary underline',
-              chevron: 'fill-primary',
-            }}
-          />
-          <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-outline-variant">
-            <p className="text-xs text-on-surface-variant">
-              {draftRange?.from
-                ? draftRange.to
-                  ? `${format(draftRange.from, 'dd/MM/yyyy')} → ${format(draftRange.to, 'dd/MM/yyyy')}`
-                  : `Từ ${format(draftRange.from, 'dd/MM/yyyy')} — chọn ngày kết thúc`
-                : 'Nhấn ngày bắt đầu, rồi ngày kết thúc'}
-            </p>
-            <div className="flex gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="px-3 py-1.5 text-sm border border-outline-variant rounded-lg"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={applyCustomRange}
-                disabled={!draftRange?.from}
-                className="px-3 py-1.5 text-sm bg-primary text-white rounded-lg font-bold disabled:opacity-40"
-              >
-                Áp dụng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {typeof document !== 'undefined' && createPortal(calendarPanel, document.body)}
     </div>
   )
 }

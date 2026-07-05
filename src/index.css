@@ -1,42 +1,58 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer utilities {
-  .glass-card {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-  }
-  .glass-card-solid {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(8px);
-  }
-  .primary-gradient {
-    background: linear-gradient(135deg, #7C3AED 0%, #A855F7 100%);
-  }
-  .soft-glow {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  }
-  .bg-custom-gradient {
-    background: linear-gradient(135deg, #F3E8FF 0%, #FAF5FF 100%);
-  }
-  .btn-primary-gradient {
-    background: linear-gradient(90deg, #7C3AED 0%, #A855F7 100%);
-  }
+.admin-date-picker {
+  --rdp-accent-color: #6750A4;
+  --rdp-accent-background-color: #EADDFF;
+  --rdp-day-height: 40px;
+  --rdp-day-width: 40px;
+  --rdp-day_button-height: 38px;
+  --rdp-day_button-width: 38px;
+  --rdp-day_button-border-radius: 0.5rem;
+  --rdp-today-color: #6750A4;
+  --rdp-range_start-color: #ffffff;
+  --rdp-range_end-color: #ffffff;
 }
 
 .admin-date-picker .rdp-root {
-  --rdp-accent-color: #6750A4;
-  --rdp-accent-background-color: #EADDFF;
-  --rdp-day-height: 36px;
-  --rdp-day-width: 36px;
+  font-size: 0.875rem;
+  color: #1C1B1F;
+}
+
+.admin-date-picker .rdp-month_caption {
+  font-weight: 700;
+  text-transform: capitalize;
+  margin-bottom: 0.5rem;
+}
+
+.admin-date-picker .rdp-weekday {
+  font-size: 0.75rem;
+  color: #79747E;
+  font-weight: 600;
 }
 
 .admin-date-picker .rdp-day_button {
   border-radius: 0.5rem;
+  cursor: pointer;
 }
 
-.admin-date-picker .rdp-day_button:hover {
+.admin-date-picker .rdp-day_button:hover:not(:disabled) {
   background-color: #EADDFF;
+}
+
+.admin-date-picker .rdp-selected .rdp-day_button {
+  background-color: #6750A4;
+  color: #ffffff;
+  border-color: #6750A4;
+}
+
+.admin-date-picker .rdp-disabled .rdp-day_button {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.admin-date-picker .rdp-button_previous,
+.admin-date-picker .rdp-button_next {
+  color: #6750A4;
+}
+
+.admin-date-picker .rdp-chevron {
+  fill: #6750A4;
 }
