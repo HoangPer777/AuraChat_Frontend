@@ -30,11 +30,11 @@ beforeAll(() => {
 })
 
 describe('getIceServers', () => {
-  it('includes STUN and TURN so calls work across different networks', () => {
+  it('uses STUN only for LAN-optimized peer connections', () => {
     const servers = getIceServers()
 
     expect(servers.some((server) => String(server.urls).includes('stun:'))).toBe(true)
-    expect(servers.some((server) => String(server.urls).includes('turn:'))).toBe(true)
+    expect(servers.some((server) => String(server.urls).includes('turn:'))).toBe(false)
   })
 })
 

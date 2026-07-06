@@ -41,8 +41,9 @@ export async function getLocalStream(kind = 'VIDEO') {
 
   const videoConstraints = {
     facingMode: 'user',
-    width: { ideal: 640 },
-    height: { ideal: 480 },
+    width: { ideal: 1280, max: 1920 },
+    height: { ideal: 720, max: 1080 },
+    frameRate: { ideal: 30, max: 30 },
   }
 
   if (kind === 'AUDIO') {

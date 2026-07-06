@@ -1,22 +1,11 @@
-const DEFAULT_STUN_SERVERS = [
-  'stun:stun.l.google.com:19302',
-  'stun:stun1.l.google.com:19302',
-  'stun:stun2.l.google.com:19302',
-]
+/**
+ * WebRTC cấu hình tối ưu cho mạng LAN (cùng Wi‑Fi).
+ * P2P trực tiếp qua host/srflx candidate — không dùng TURN relay (nhanh hơn, ít trễ).
+ */
 
-// Fallback công cộng — dùng khi chưa có TURN riêng trên EC2.
-const DEFAULT_TURN_SERVERS = [
-  {
-    urls: [
-      'turn:openrelay.metered.ca:80',
-      'turn:openrelay.metered.ca:443',
-      'turn:openrelay.metered.ca:443?transport=tcp',
-      'turn:openrelay.metered.ca:3478',
-      'turns:openrelay.metered.ca:443',
-    ],
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
+const LAN_STUN_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
 ]
 
 function parseIceServersFromEnv(rawValue) {
@@ -36,21 +25,7 @@ export function getIceServers() {
     return fromEnv
   }
 
-  const turnUrl = import.meta.env.VITE_TURN_URL?.trim()
-  const turnUsername = import.meta.env.VITE_TURN_USERNAME?.trim()
-  const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL?.trim()
-
-  const servers = DEFAULT_STUN_SERVERS.map((urls) => ({ urls }))
-
-  if (turnUrl && turnUsername && turnCredential) {
-    servers.push({
-      urls: turnUrl.split(',').map((item) => item.trim()).filter(Boolean),
-      username: turnUsername,
-      credential: turnCredential,
-    })
-  }
-
-  return [...servers, ...DEFAULT_TURN_SERVERS]
+  return LAN_STUN_SERVERS
 }
 
 export function createRemoteMediaStream() {
@@ -76,18 +51,15 @@ export function createRemoteMediaStream() {
 export function getPeerConnectionConfig() {
   return {
     iceServers: getIceServers(),
-    iceCandidatePoolSize: 10,
+    iceCandidatePoolSize: 4,
     bundlePolicy: 'max-bundle',
     rtcpMuxPolicy: 'require',
     iceTransportPolicy: 'all',
   }
 }
 
-/**
- * Chờ ICE gathering xong để nhúng candidate vào SDP.
- * Giảm phụ thuộc trickle ICE qua SockJS (hay bị QUIC/ngắt kết nối).
- */
-export function waitForIceGatheringComplete(peerConnection, timeoutMs = 8000) {
+/** Chờ ICE gathering — timeout ngắn hơn vì LAN thường gather nhanh. */
+export function waitForIceGatheringComplete(peerConnection, timeoutMs = 4000) {
   if (!peerConnection || peerConnection.iceGatheringState === 'complete') {
     return Promise.resolve()
   }
