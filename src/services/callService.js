@@ -1,7 +1,7 @@
 import { getPeerConnectionConfig } from '../config/webrtc'
 import { send } from './websocket'
 
-export function createPeerConnection({ onTrack, onIceCandidate, onConnectionStateChange }) {
+export function createPeerConnection({ onTrack, onIceCandidate, onConnectionStateChange, onIceConnectionStateChange }) {
   const peerConnection = new RTCPeerConnection(getPeerConnectionConfig())
 
   peerConnection.ontrack = (event) => {
@@ -16,6 +16,19 @@ export function createPeerConnection({ onTrack, onIceCandidate, onConnectionStat
 
   peerConnection.onconnectionstatechange = () => {
     onConnectionStateChange?.(peerConnection.connectionState)
+  }
+
+  peerConnection.oniceconnectionstatechange = () => {
+    const state = peerConnection.iceConnectionState
+    onIceConnectionStateChange?.(state)
+
+    if (state === 'failed') {
+      try {
+        peerConnection.restartIce()
+      } catch (error) {
+        console.warn('ICE restart failed:', error)
+      }
+    }
   }
 
   return peerConnection

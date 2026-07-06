@@ -1,5 +1,5 @@
 import { createPeerConnection } from '../services/callService'
-import { createRemoteMediaStream } from '../config/webrtc'
+import { createRemoteMediaStream, waitForIceGatheringComplete } from '../config/webrtc'
 
 export function createGroupMeshManager({
   onRemoteStream,
@@ -83,7 +83,8 @@ export function createGroupMeshManager({
         offerToReceiveVideo: isVideoCall,
       })
       await peerConnection.setLocalDescription(offer)
-      return offer.sdp
+      await waitForIceGatheringComplete(peerConnection)
+      return peerConnection.localDescription?.sdp || offer.sdp
     },
 
     async handlePeerOffer(remoteUserId, sdp, localStream, isVideoCall) {
@@ -91,8 +92,9 @@ export function createGroupMeshManager({
       await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp }))
       const answer = await peerConnection.createAnswer()
       await peerConnection.setLocalDescription(answer)
+      await waitForIceGatheringComplete(peerConnection)
       await flushRemoteCandidates(remoteUserId)
-      return answer.sdp
+      return peerConnection.localDescription?.sdp || answer.sdp
     },
 
     async handlePeerAnswer(remoteUserId, sdp) {

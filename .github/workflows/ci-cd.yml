@@ -113,6 +113,15 @@ jobs:
             # Dùng relative path để tránh Mixed Content khi deploy HTTPS
             echo "VITE_API_BASE_URL=/api" >> .env
 
+            TURN_HOST="${{ secrets.TURN_HOST }}"
+            if [ -z "$TURN_HOST" ]; then
+              TURN_HOST="${{ secrets.HOST }}"
+            fi
+            TURN_PASSWORD="${{ secrets.TURN_PASSWORD }}"
+            if [ -z "$TURN_PASSWORD" ]; then
+              TURN_PASSWORD="aurachatturn2026"
+            fi
+
             # TẮT BUILDKIT: Ép Docker dùng bộ build truyền thống
             export DOCKER_BUILDKIT=0
             export COMPOSE_DOCKER_CLI_BUILD=0
@@ -120,8 +129,13 @@ jobs:
             echo "Cưỡng ép dọn dẹp container cũ để xóa bỏ hoàn toàn xung đột mạng..."
             docker rm -f aurachat-frontend 2>/dev/null || true
 
-            # Build image thủ công (tránh lỗi buildx version cũ)
-            DOCKER_BUILDKIT=0 docker build -t project-fe-frontend .
+            # Build image — nhúng TURN EC2 vào bundle (WebRTC cần lúc build, không phải runtime)
+            DOCKER_BUILDKIT=0 docker build -t project-fe-frontend \
+              --build-arg VITE_API_BASE_URL=/api \
+              --build-arg VITE_TURN_URL="turn:${TURN_HOST}:3478,turns:${TURN_HOST}:5349?transport=tcp" \
+              --build-arg VITE_TURN_USERNAME=aurachat \
+              --build-arg VITE_TURN_CREDENTIAL="${TURN_PASSWORD}" \
+              .
 
             # Chạy container mới
             docker run -d \

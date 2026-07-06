@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { createRemoteMediaStream } from '../../config/webrtc'
+import { createRemoteMediaStream, waitForIceGatheringComplete } from '../../config/webrtc'
 import { useLocation, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
 import { connect, isConnected, subscribe } from '../../services/websocket'
@@ -386,7 +386,12 @@ export default function VideoCallPage() {
       }
 
       remoteStreamCollectorRef.current.addFromTrackEvent(event)
-      setRemotePreviewStream(new MediaStream(remoteStreamCollectorRef.current.getStream().getTracks()))
+      const mergedStream = new MediaStream(remoteStreamCollectorRef.current.getStream().getTracks())
+      setRemotePreviewStream(mergedStream)
+
+      if (remoteAudioRef.current) {
+        attachStreamToVideo(remoteAudioRef.current, mergedStream)
+      }
     }
 
     const sendIceCandidate = (candidate) => {
@@ -445,6 +450,12 @@ export default function VideoCallPage() {
             setCallStatus('ended')
           }
         },
+        onIceConnectionStateChange: (state) => {
+          if (state === 'connected' || state === 'completed') {
+            setCallStatus('connected')
+            setStatusText('Cuộc gọi đã kết nối')
+          }
+        },
       })
 
       peerConnectionRef.current = peerConnection
@@ -455,6 +466,7 @@ export default function VideoCallPage() {
         await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: callIntent.sdp }))
         const answer = await peerConnection.createAnswer()
         await peerConnection.setLocalDescription(answer)
+        await waitForIceGatheringComplete(peerConnection)
 
         const acceptedAt = new Date().toISOString()
 
@@ -462,7 +474,7 @@ export default function VideoCallPage() {
           callId: callIntent.callId,
           callerId: callIntent.callerId,
           receiverId: callIntent.receiverId || user?.id,
-          sdp: answer.sdp,
+          sdp: peerConnection.localDescription?.sdp || answer.sdp,
           acceptedAt,
         })
 
@@ -480,12 +492,13 @@ export default function VideoCallPage() {
           offerToReceiveVideo: !isAudioCall,
         })
         await peerConnection.setLocalDescription(offer)
+        await waitForIceGatheringComplete(peerConnection)
 
         const published = await publishCallOffer({
           receiverId: callIntent.receiverId,
           type: callType,
           conversationId: callIntent.conversationId,
-          sdp: offer.sdp,
+          sdp: peerConnection.localDescription?.sdp || offer.sdp,
         })
 
         if (!published) {

@@ -4,13 +4,15 @@ const DEFAULT_STUN_SERVERS = [
   'stun:stun2.l.google.com:19302',
 ]
 
-// Public test relay — đủ cho demo/xuyên mạng; production nên dùng TURN riêng qua env.
+// Fallback công cộng — dùng khi chưa có TURN riêng trên EC2.
 const DEFAULT_TURN_SERVERS = [
   {
     urls: [
       'turn:openrelay.metered.ca:80',
       'turn:openrelay.metered.ca:443',
       'turn:openrelay.metered.ca:443?transport=tcp',
+      'turn:openrelay.metered.ca:3478',
+      'turns:openrelay.metered.ca:443',
     ],
     username: 'openrelayproject',
     credential: 'openrelayproject',
@@ -46,7 +48,6 @@ export function getIceServers() {
       username: turnUsername,
       credential: turnCredential,
     })
-    return servers
   }
 
   return [...servers, ...DEFAULT_TURN_SERVERS]
@@ -78,5 +79,30 @@ export function getPeerConnectionConfig() {
     iceCandidatePoolSize: 10,
     bundlePolicy: 'max-bundle',
     rtcpMuxPolicy: 'require',
+    iceTransportPolicy: 'all',
   }
+}
+
+/**
+ * Chờ ICE gathering xong để nhúng candidate vào SDP.
+ * Giảm phụ thuộc trickle ICE qua SockJS (hay bị QUIC/ngắt kết nối).
+ */
+export function waitForIceGatheringComplete(peerConnection, timeoutMs = 8000) {
+  if (!peerConnection || peerConnection.iceGatheringState === 'complete') {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve) => {
+    const timeout = window.setTimeout(resolve, timeoutMs)
+
+    const onStateChange = () => {
+      if (peerConnection.iceGatheringState === 'complete') {
+        window.clearTimeout(timeout)
+        peerConnection.removeEventListener('icegatheringstatechange', onStateChange)
+        resolve()
+      }
+    }
+
+    peerConnection.addEventListener('icegatheringstatechange', onStateChange)
+  })
 }
