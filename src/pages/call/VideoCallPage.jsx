@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { createRemoteMediaStream } from '../../config/webrtc'
 import { useLocation, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
 import { connect, isConnected, subscribe } from '../../services/websocket'
@@ -52,6 +53,7 @@ export default function VideoCallPage() {
   const remoteVideoRef = useRef(null)
   const remoteAudioRef = useRef(null)
   const localStreamRef = useRef(null)
+  const remoteStreamCollectorRef = useRef(null)
   const peerConnectionRef = useRef(null)
   const pendingRemoteCandidatesRef = useRef([])
   const pendingLocalCandidatesRef = useRef([])
@@ -173,6 +175,7 @@ export default function VideoCallPage() {
 
       peerConnectionRef.current?.close?.()
       peerConnectionRef.current = null
+      remoteStreamCollectorRef.current = null
     }
 
     const resolveTimestampMs = (...values) => {
@@ -378,10 +381,12 @@ export default function VideoCallPage() {
     }
 
     const attachRemoteStream = (event) => {
-      const [remoteStream] = event.streams
-      if (remoteStream) {
-        setRemotePreviewStream(remoteStream)
+      if (!remoteStreamCollectorRef.current) {
+        remoteStreamCollectorRef.current = createRemoteMediaStream()
       }
+
+      remoteStreamCollectorRef.current.addFromTrackEvent(event)
+      setRemotePreviewStream(new MediaStream(remoteStreamCollectorRef.current.getStream().getTracks()))
     }
 
     const sendIceCandidate = (candidate) => {
@@ -562,7 +567,7 @@ export default function VideoCallPage() {
 
   return (
     <div className="bg-[#0f0f13] h-screen w-screen overflow-hidden text-white font-sans relative">
-      <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+      <audio ref={remoteAudioRef} autoPlay playsInline muted={false} className="sr-only" />
 
       {showRemoteVideo ? (
         <div className="absolute inset-0 z-0">

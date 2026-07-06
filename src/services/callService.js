@@ -1,12 +1,8 @@
+import { getPeerConnectionConfig } from '../config/webrtc'
 import { send } from './websocket'
 
 export function createPeerConnection({ onTrack, onIceCandidate, onConnectionStateChange }) {
-  const peerConnection = new RTCPeerConnection({
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-    ],
-  })
+  const peerConnection = new RTCPeerConnection(getPeerConnectionConfig())
 
   peerConnection.ontrack = (event) => {
     onTrack?.(event)

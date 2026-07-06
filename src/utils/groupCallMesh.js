@@ -1,4 +1,5 @@
 import { createPeerConnection } from '../services/callService'
+import { createRemoteMediaStream } from '../config/webrtc'
 
 export function createGroupMeshManager({
   onRemoteStream,
@@ -7,6 +8,14 @@ export function createGroupMeshManager({
 }) {
   const peerConnections = new Map()
   const pendingRemoteCandidates = new Map()
+  const remoteStreams = new Map()
+
+  const getRemoteStream = (remoteUserId) => {
+    if (!remoteStreams.has(remoteUserId)) {
+      remoteStreams.set(remoteUserId, createRemoteMediaStream())
+    }
+    return remoteStreams.get(remoteUserId)
+  }
 
   const getPending = (remoteUserId) => {
     if (!pendingRemoteCandidates.has(remoteUserId)) {
@@ -22,10 +31,9 @@ export function createGroupMeshManager({
 
     const peerConnection = createPeerConnection({
       onTrack: (event) => {
-        const [stream] = event.streams
-        if (stream) {
-          onRemoteStream?.(remoteUserId, stream)
-        }
+        const remote = getRemoteStream(remoteUserId)
+        remote.addFromTrackEvent(event)
+        onRemoteStream?.(remoteUserId, new MediaStream(remote.getStream().getTracks()))
       },
       onIceCandidate: (candidate) => {
         onIceCandidate?.(remoteUserId, candidate)
@@ -112,6 +120,7 @@ export function createGroupMeshManager({
       peerConnections.forEach((peerConnection) => peerConnection.close())
       peerConnections.clear()
       pendingRemoteCandidates.clear()
+      remoteStreams.clear()
     },
   }
 }
