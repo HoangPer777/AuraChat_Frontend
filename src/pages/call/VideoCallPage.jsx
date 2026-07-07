@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { createRemoteMediaStream, streamHasLiveVideo, waitForIceGatheringComplete } from '../../config/webrtc'
+import { createRemoteMediaStream, streamHasVideoTrack, waitForIceGatheringComplete } from '../../config/webrtc'
 import { useLocation, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
 import { connect, isConnected, subscribe } from '../../services/websocket'
@@ -8,11 +8,12 @@ import { getTerminalCallMessage, isCallRingingAck } from '../../utils/callHelper
 import { startOutgoingRing, stopRing } from '../../utils/callRingtone'
 import {
   attachStreamToVideo,
-  attachLocalTracks,
+  attachRemoteCallMedia,
   createPeerConnection,
   createVideoAnswer,
   createVideoOffer,
   getLocalStream,
+  setupVideoCallPeerConnection,
   publishCallAnswer,
   publishCallEnd,
   publishCallOffer,
@@ -96,26 +97,32 @@ export default function VideoCallPage() {
   useEffect(() => {
     if (!remotePreviewStream || !remoteVideoRef.current || isAudioCall) return undefined
 
-    attachStreamToVideo(remoteVideoRef.current, remotePreviewStream)
+    attachRemoteCallMedia(remotePreviewStream, {
+      videoEl: remoteVideoRef.current,
+      audioEl: remoteAudioRef.current,
+    })
 
     return undefined
-  }, [remotePreviewStream, remoteHasVideo, isAudioCall])
+  }, [remotePreviewStream, remoteHasVideo, isAudioCall, callStatus])
 
   useEffect(() => {
-    if (!remotePreviewStream) {
-      setRemoteHasVideo(false)
-      return undefined
-    }
+    if (!remotePreviewStream || isAudioCall) return undefined
 
     const updateRemoteVideo = () => {
-      setRemoteHasVideo(streamHasLiveVideo(remotePreviewStream))
+      setRemoteHasVideo(streamHasVideoTrack(remotePreviewStream))
     }
 
     updateRemoteVideo()
 
     const listeners = []
     remotePreviewStream.getVideoTracks().forEach((track) => {
-      const onChange = () => updateRemoteVideo()
+      const onChange = () => {
+        updateRemoteVideo()
+        attachRemoteCallMedia(remotePreviewStream, {
+          videoEl: remoteVideoRef.current,
+          audioEl: remoteAudioRef.current,
+        })
+      }
       track.addEventListener('ended', onChange)
       track.addEventListener('mute', onChange)
       track.addEventListener('unmute', onChange)
@@ -132,12 +139,15 @@ export default function VideoCallPage() {
   }, [remotePreviewStream, isAudioCall])
 
   useEffect(() => {
-    if (!remotePreviewStream || !remoteAudioRef.current) return undefined
+    if (!remotePreviewStream || !remoteAudioRef.current || isAudioCall) return undefined
 
-    attachStreamToVideo(remoteAudioRef.current, remotePreviewStream)
+    attachRemoteCallMedia(remotePreviewStream, {
+      audioEl: remoteAudioRef.current,
+      videoEl: remoteVideoRef.current,
+    })
 
     return undefined
-  }, [remotePreviewStream])
+  }, [remotePreviewStream, isAudioCall])
 
   useEffect(() => {
     if (callStatus !== 'connected' || !callStartedAt) {
@@ -397,16 +407,14 @@ export default function VideoCallPage() {
 
       if (event.track?.kind === 'video') {
         setRemoteHasVideo(true)
-      } else if (streamHasLiveVideo(mergedStream)) {
+      } else if (streamHasVideoTrack(mergedStream)) {
         setRemoteHasVideo(true)
       }
 
-      if (remoteAudioRef.current) {
-        attachStreamToVideo(remoteAudioRef.current, mergedStream)
-      }
-      if (remoteVideoRef.current && !isAudioCall) {
-        attachStreamToVideo(remoteVideoRef.current, mergedStream)
-      }
+      attachRemoteCallMedia(mergedStream, {
+        videoEl: remoteVideoRef.current,
+        audioEl: remoteAudioRef.current,
+      })
     }
 
     const sendIceCandidate = (candidate) => {
@@ -448,7 +456,10 @@ export default function VideoCallPage() {
 
       localStreamRef.current = localStream
       if (!isAudioCall && streamHasVideo) {
+        setIsCamOn(true)
         setLocalPreviewStream(localStream)
+      } else if (!isAudioCall && !streamHasVideo) {
+        setStatusText('Không mở được camera thiết bị này — vẫn có thể xem video đối phương')
       }
 
       const peerConnection = createPeerConnection({
@@ -474,7 +485,7 @@ export default function VideoCallPage() {
       })
 
       peerConnectionRef.current = peerConnection
-      attachLocalTracks(peerConnection, localStream)
+      setupVideoCallPeerConnection(peerConnection, localStream, !isAudioCall)
 
       if (callIntent.mode === 'incoming') {
         resolveCallId(callIntent.callId)
@@ -580,7 +591,7 @@ export default function VideoCallPage() {
   const remoteAvatar = callIntent?.receiverAvatar || callIntent?.callerAvatar
     || `https://ui-avatars.com/api/?name=${encodeURIComponent(remoteName)}`
   const callTypeLabel = isAudioCall ? 'Cuộc gọi thoại' : 'Cuộc gọi video'
-  const showRemoteVideo = !isAudioCall && remoteHasVideo
+  const showRemoteVideo = !isAudioCall && (remoteHasVideo || streamHasVideoTrack(remotePreviewStream))
   const showAvatarStage = isAudioCall || !showRemoteVideo
 
   if (!callIntent) {
@@ -598,6 +609,7 @@ export default function VideoCallPage() {
             ref={remoteVideoRef}
             autoPlay
             playsInline
+            muted
             className="w-full h-full object-cover bg-black"
             style={{ opacity: showRemoteVideo ? 0.9 : 0 }}
           />

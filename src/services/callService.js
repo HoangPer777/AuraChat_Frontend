@@ -50,6 +50,13 @@ export async function getLocalStream(kind = 'VIDEO') {
     return navigator.mediaDevices.getUserMedia({ audio: true, video: false })
   }
 
+  // Thử constraint đơn giản trước — desktop/mobile đều tương thích
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+  } catch {
+    // fall through
+  }
+
   try {
     return await navigator.mediaDevices.getUserMedia({ audio: true, video: videoConstraints })
   } catch (error) {
@@ -78,8 +85,11 @@ export async function getLocalStream(kind = 'VIDEO') {
   }
 }
 
-export async function attachStreamToVideo(videoEl, stream) {
+export async function attachStreamToVideo(videoEl, stream, options = {}) {
   if (!videoEl || !stream) return false
+
+  const { muted = false } = options
+  videoEl.muted = muted
 
   if (videoEl.srcObject !== stream) {
     videoEl.srcObject = stream
@@ -96,21 +106,49 @@ export async function attachStreamToVideo(videoEl, stream) {
   }
 }
 
+export function attachRemoteCallMedia(stream, { videoEl, audioEl } = {}) {
+  if (!stream) return
+
+  const videoTracks = stream.getVideoTracks()
+  const audioTracks = stream.getAudioTracks()
+
+  if (videoEl && videoTracks.length > 0) {
+    attachStreamToVideo(videoEl, new MediaStream(videoTracks), { muted: true })
+  }
+
+  if (audioEl && audioTracks.length > 0) {
+    attachStreamToVideo(audioEl, new MediaStream(audioTracks), { muted: false })
+  }
+}
+
 export function attachLocalTracks(peerConnection, localStream) {
   if (!peerConnection || !localStream) return
 
-  const senders = peerConnection.getSenders()
   localStream.getTracks().forEach((track) => {
-    const existing = senders.find((sender) => sender.track?.kind === track.kind)
+    const existing = peerConnection.getSenders().find((sender) => sender.track?.kind === track.kind)
     if (existing) {
-      existing.replaceTrack(track).catch((error) => {
-        console.warn('replaceTrack failed, falling back to addTrack:', error)
+      existing.replaceTrack(track).catch(() => {
         peerConnection.addTrack(track, localStream)
       })
       return
     }
     peerConnection.addTrack(track, localStream)
   })
+}
+
+export function setupVideoCallPeerConnection(peerConnection, localStream, isVideoCall) {
+  if (!isVideoCall) {
+    attachLocalTracks(peerConnection, localStream)
+    return
+  }
+
+  const hasLocalVideo = localStream.getVideoTracks().length > 0
+  attachLocalTracks(peerConnection, localStream)
+
+  const hasVideoSender = peerConnection.getSenders().some((sender) => sender.track?.kind === 'video')
+  if (!hasLocalVideo && !hasVideoSender) {
+    peerConnection.addTransceiver('video', { direction: 'recvonly' })
+  }
 }
 
 export async function createVideoOffer(peerConnection) {

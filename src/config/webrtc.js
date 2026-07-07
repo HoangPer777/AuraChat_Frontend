@@ -60,7 +60,12 @@ export function createRemoteMediaStream() {
 
 export function streamHasLiveVideo(stream) {
   if (!stream) return false
-  return stream.getVideoTracks().some((track) => track.readyState === 'live')
+  return stream.getVideoTracks().some((track) => track.readyState !== 'ended')
+}
+
+export function streamHasVideoTrack(stream) {
+  if (!stream) return false
+  return stream.getVideoTracks().length > 0
 }
 
 export function getPeerConnectionConfig() {
