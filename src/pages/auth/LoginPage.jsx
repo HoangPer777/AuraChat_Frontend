@@ -5,6 +5,7 @@ import api from '../../services/api';
 import useAuthStore from '../../store/authStore';
 import { getRedirectResult, signInWithPopup, signInWithRedirect } from 'firebase/auth';
 import { auth, googleProvider, facebookProvider } from '../../config/firebase';
+import { isPopupBlockedError, shouldPreferOAuthRedirect } from '../../utils/oauth';
 
 /**
  * LoginPage
@@ -48,6 +49,8 @@ export default function LoginPage() {
         const result = await getRedirectResult(auth);
         if (!result?.user) return;
 
+        if (active) setIsLoading(true);
+
         const idToken = await result.user.getIdToken();
         const response = await api.post('/auth/firebase/login', { idToken });
 
@@ -67,6 +70,8 @@ export default function LoginPage() {
           console.error('Firebase redirect login error:', err);
           setApiError(err.response?.data?.message || err.message || 'Đã có lỗi xảy ra.');
         }
+      } finally {
+        if (active) setIsLoading(false);
       }
     };
 
@@ -127,36 +132,41 @@ export default function LoginPage() {
     }
   };
 
-  // Google / Facebook popup or redirect login
+  // Google / Facebook — mobile dùng redirect (popup hay bị chặn)
   const handleSocialLogin = async (providerName, options = {}) => {
     if (isLoading) return;
     setApiError(null);
     setIsLoading(true);
     try {
       const provider = providerName === 'Google' ? googleProvider : facebookProvider;
+      const useRedirect = options.useRedirect ?? shouldPreferOAuthRedirect();
 
-      if (options.useRedirect) {
+      if (useRedirect) {
         await signInWithRedirect(auth, provider);
-        return; // page will reload
+        return;
       }
 
-      const result = await signInWithPopup(auth, provider);
-      const idToken = await result.user.getIdToken();
-      const response = await api.post('/auth/firebase/login', { idToken });
+      try {
+        const result = await signInWithPopup(auth, provider);
+        const idToken = await result.user.getIdToken();
+        const response = await api.post('/auth/firebase/login', { idToken });
 
-      if (response.data?.success) {
-        const { accessToken, refreshToken, user } = response.data.data;
-        setAuth(user, accessToken, refreshToken);
-        redirectAfterLogin(user);
-      } else {
-        setApiError(response.data?.message || `Đăng nhập bằng ${providerName} thất bại.`);
+        if (response.data?.success) {
+          const { accessToken, refreshToken, user } = response.data.data;
+          setAuth(user, accessToken, refreshToken);
+          redirectAfterLogin(user);
+        } else {
+          setApiError(response.data?.message || `Đăng nhập bằng ${providerName} thất bại.`);
+        }
+      } catch (popupError) {
+        if (isPopupBlockedError(popupError)) {
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        throw popupError;
       }
     } catch (err) {
       if (err.code === 'auth/popup-closed-by-user') return;
-      if (err.code === 'auth/popup-blocked') {
-        setApiError('Popup bị chặn. Hãy cho phép popup hoặc dùng chế độ chuyển hướng.');
-        return;
-      }
       if (err.code === 'auth/cancelled-popup-request') {
         setApiError('Đang có yêu cầu đăng nhập khác. Vui lòng thử lại.');
         return;
@@ -166,6 +176,8 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  const preferRedirect = shouldPreferOAuthRedirect();
 
   return (
     <div className="bg-background min-h-screen flex items-stretch overflow-hidden">
@@ -323,22 +335,31 @@ export default function LoginPage() {
           </div>
 
           <div className="text-center font-body-main flex flex-col gap-2">
-            <button
-              onClick={() => handleSocialLogin('Google', { useRedirect: true })}
-              disabled={isLoading}
-              className={`font-label-sm font-semibold text-primary transition-colors ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:text-secondary-container'}`}
-              type="button"
-            >
-              Đăng nhập Google bằng chuyển hướng
-            </button>
-            <button
-              onClick={() => handleSocialLogin('Facebook', { useRedirect: true })}
-              disabled={isLoading}
-              className={`font-label-sm font-semibold text-primary transition-colors ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:text-secondary-container'}`}
-              type="button"
-            >
-              Đăng nhập Facebook bằng chuyển hướng
-            </button>
+            {!preferRedirect && (
+              <>
+                <button
+                  onClick={() => handleSocialLogin('Google', { useRedirect: true })}
+                  disabled={isLoading}
+                  className={`font-label-sm font-semibold text-primary transition-colors ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:text-secondary-container'}`}
+                  type="button"
+                >
+                  Đăng nhập Google bằng chuyển hướng
+                </button>
+                <button
+                  onClick={() => handleSocialLogin('Facebook', { useRedirect: true })}
+                  disabled={isLoading}
+                  className={`font-label-sm font-semibold text-primary transition-colors ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:text-secondary-container'}`}
+                  type="button"
+                >
+                  Đăng nhập Facebook bằng chuyển hướng
+                </button>
+              </>
+            )}
+            {preferRedirect && (
+              <p className="text-xs text-on-surface-variant">
+                Trên điện thoại, đăng nhập Google/Facebook sẽ chuyển sang trang xác thực rồi quay lại app.
+              </p>
+            )}
           </div>
 
           <div className="text-center font-body-main">
