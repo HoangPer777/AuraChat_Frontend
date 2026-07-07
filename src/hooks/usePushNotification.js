@@ -5,11 +5,29 @@ import { registerFcmToken } from '../services/notificationService'
 import useAuthStore from '../store/authStore'
 import useNotificationStore from '../store/notificationStore'
 import { showBrowserNotification } from '../utils/browserNotification'
+import { registerFirebaseServiceWorker } from '../utils/firebaseServiceWorker'
+
+async function ensureNotificationPermission() {
+  if (typeof Notification === 'undefined') {
+    return 'denied'
+  }
+
+  if (Notification.permission === 'granted') {
+    return 'granted'
+  }
+
+  if (Notification.permission === 'denied') {
+    return 'denied'
+  }
+
+  return Notification.requestPermission()
+}
 
 export default function usePushNotification() {
   const { accessToken } = useAuthStore()
   const pushEnabled = useNotificationStore((s) => s.pushEnabled)
   const setPushEnabled = useNotificationStore((s) => s.setPushEnabled)
+  const setBrowserPermission = useNotificationStore((s) => s.setBrowserPermission)
   const addNotification = useNotificationStore((s) => s.addNotification)
 
   useEffect(() => {
@@ -28,8 +46,18 @@ export default function usePushNotification() {
         return
       }
 
+      const permission = await ensureNotificationPermission()
+      setBrowserPermission(permission)
+      if (permission !== 'granted') {
+        console.warn('Notification permission chưa được cấp — bỏ qua FCM push')
+        setPushEnabled(false)
+        return
+      }
+
       try {
-        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js')
+        const registration = await registerFirebaseServiceWorker()
+        if (!registration || !active) return
+
         const token = await getToken(messaging, {
           vapidKey,
           serviceWorkerRegistration: registration,
@@ -75,5 +103,5 @@ export default function usePushNotification() {
       active = false
       unsubscribe?.()
     }
-  }, [accessToken, addNotification, pushEnabled, setPushEnabled])
+  }, [accessToken, addNotification, pushEnabled, setBrowserPermission, setPushEnabled])
 }

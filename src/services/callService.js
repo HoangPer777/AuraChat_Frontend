@@ -34,6 +34,85 @@ export function createPeerConnection({ onTrack, onIceCandidate, onConnectionStat
   return peerConnection
 }
 
+export async function countVideoInputDevices() {
+  if (!navigator.mediaDevices?.enumerateDevices) return null
+
+  const devices = await navigator.mediaDevices.enumerateDevices()
+  return devices.filter((device) => device.kind === 'videoinput').length
+}
+
+export async function requestLocalVideoTrack() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error('Trình duyệt không hỗ trợ camera.')
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+  const track = stream.getVideoTracks()[0]
+
+  if (!track) {
+    stream.getTracks().forEach((item) => item.stop())
+    throw new Error('Không tìm thấy camera trên thiết bị này.')
+  }
+
+  return track
+}
+
+export async function enableLocalVideoForCall(peerConnection, localStream) {
+  if (!localStream) {
+    throw new Error('Local stream chưa sẵn sàng.')
+  }
+
+  let videoTrack = localStream.getVideoTracks()[0]
+  if (!videoTrack) {
+    videoTrack = await requestLocalVideoTrack()
+    localStream.addTrack(videoTrack)
+  } else {
+    videoTrack.enabled = true
+  }
+
+  const videoSender = peerConnection?.getSenders()?.find((sender) => sender.track?.kind === 'video')
+  if (videoSender) {
+    await videoSender.replaceTrack(videoTrack)
+    return { videoTrack, renegotiateRequired: false }
+  }
+
+  const videoTransceiver = peerConnection?.getTransceivers()?.find(
+    (transceiver) => transceiver.sender?.track?.kind === 'video'
+      || transceiver.receiver?.track?.kind === 'video'
+      || transceiver.direction === 'recvonly',
+  )
+
+  if (videoTransceiver) {
+    await videoTransceiver.sender.replaceTrack(videoTrack)
+    videoTransceiver.direction = 'sendrecv'
+    return { videoTrack, renegotiateRequired: true }
+  }
+
+  if (peerConnection) {
+    peerConnection.addTrack(videoTrack, localStream)
+    return { videoTrack, renegotiateRequired: true }
+  }
+
+  return { videoTrack, renegotiateRequired: false }
+}
+
+export async function createRenegotiationOffer(peerConnection) {
+  const offer = await peerConnection.createOffer()
+  await peerConnection.setLocalDescription(offer)
+  return peerConnection.localDescription?.sdp || offer.sdp
+}
+
+export async function applyRenegotiationOffer(peerConnection, sdp) {
+  await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp }))
+  const answer = await peerConnection.createAnswer()
+  await peerConnection.setLocalDescription(answer)
+  return peerConnection.localDescription?.sdp || answer.sdp
+}
+
+export async function applyRenegotiationAnswer(peerConnection, sdp) {
+  await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }))
+}
+
 export async function getLocalStream(kind = 'VIDEO') {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error('Trình duyệt không hỗ trợ camera hoặc microphone.')
@@ -169,6 +248,10 @@ export function publishCallOffer(payload) {
 
 export function publishCallAnswer(payload) {
   return send('/app/call/answer', payload)
+}
+
+export function publishCallRenegotiate(payload) {
+  return send('/app/call/renegotiate', payload)
 }
 
 export function publishIceCandidate(payload) {

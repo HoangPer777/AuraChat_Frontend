@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 import { bootstrapFirebaseRedirect } from './utils/firebaseRedirectAuth'
+import { registerFirebaseServiceWorker } from './utils/firebaseServiceWorker'
 
 /**
  * Validate required environment variables on app startup
@@ -59,6 +60,12 @@ const envValid = (() => {
 
 if (envValid) {
   bootstrapFirebaseRedirect()
+
+  if ('serviceWorker' in navigator && import.meta.env.VITE_FIREBASE_VAPID_KEY) {
+    registerFirebaseServiceWorker().catch((error) => {
+      console.warn('Firebase service worker preload failed:', error)
+    })
+  }
 
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>

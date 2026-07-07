@@ -9,14 +9,20 @@ import { startOutgoingRing, stopRing } from '../../utils/callRingtone'
 import {
   attachStreamToVideo,
   attachRemoteCallMedia,
+  applyRenegotiationAnswer,
+  applyRenegotiationOffer,
+  countVideoInputDevices,
   createPeerConnection,
+  createRenegotiationOffer,
   createVideoAnswer,
   createVideoOffer,
+  enableLocalVideoForCall,
   getLocalStream,
   setupVideoCallPeerConnection,
   publishCallAnswer,
   publishCallEnd,
   publishCallOffer,
+  publishCallRenegotiate,
   publishIceCandidate,
 } from '../../services/callService'
 import {
@@ -379,6 +385,25 @@ export default function VideoCallPage() {
         return
       }
 
+      if (message.renegotiate && message.sdp) {
+        const peerConnection = peerConnectionRef.current
+        if (!peerConnection) return
+
+        if (message.sdpType === 'offer') {
+          const answerSdp = await applyRenegotiationOffer(peerConnection, message.sdp)
+          publishCallRenegotiate({
+            callId: callIdRef.current,
+            targetUserId: message.senderId,
+            sdpType: 'answer',
+            sdp: answerSdp,
+          })
+        } else {
+          await applyRenegotiationAnswer(peerConnection, message.sdp)
+        }
+
+        return
+      }
+
       if (message.status === 'DECLINED' || message.status === 'COMPLETED' || message.status === 'MISSED') {
         finishCall(message)
         return
@@ -459,7 +484,12 @@ export default function VideoCallPage() {
         setIsCamOn(true)
         setLocalPreviewStream(localStream)
       } else if (!isAudioCall && !streamHasVideo) {
-        setStatusText('Không mở được camera thiết bị này — vẫn có thể xem video đối phương')
+        const videoDeviceCount = await countVideoInputDevices()
+        if (videoDeviceCount === 0) {
+          setStatusText('Máy không có camera — bạn vẫn xem được video đối phương. Cắm webcam rồi bấm nút camera.')
+        } else {
+          setStatusText('Chưa mở được camera — bấm nút camera để thử lại')
+        }
       }
 
       const peerConnection = createPeerConnection({
@@ -682,12 +712,44 @@ export default function VideoCallPage() {
           setIsMicOn(next)
           toggleTrack('audio', next)
         }}
-        onToggleCam={() => {
+        onToggleCam={async () => {
+          if (isAudioCall) return
+
           const next = !isCamOn
-          setIsCamOn(next)
-          toggleTrack('video', next)
-          if (next && localStreamRef.current && hasVideoTrack) {
-            setLocalPreviewStream(localStreamRef.current)
+          if (!next) {
+            setIsCamOn(false)
+            toggleTrack('video', false)
+            return
+          }
+
+          try {
+            const { renegotiateRequired } = await enableLocalVideoForCall(
+              peerConnectionRef.current,
+              localStreamRef.current,
+            )
+
+            setHasVideoTrack(true)
+            setIsCamOn(true)
+            setLocalPreviewStream(new MediaStream(localStreamRef.current.getTracks()))
+
+            if (renegotiateRequired && peerConnectionRef.current && callIdRef.current) {
+              const targetUserId = callIntent.mode === 'incoming'
+                ? callIntent.callerId
+                : callIntent.receiverId
+
+              if (targetUserId) {
+                const sdp = await createRenegotiationOffer(peerConnectionRef.current)
+                publishCallRenegotiate({
+                  callId: callIdRef.current,
+                  targetUserId,
+                  sdpType: 'offer',
+                  sdp,
+                })
+              }
+            }
+          } catch (error) {
+            setIsCamOn(false)
+            setStatusText(error.message || 'Không mở được camera')
           }
         }}
         onEndCall={handleEndCall}
