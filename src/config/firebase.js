@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAnalytics } from 'firebase/analytics'
-import { getAuth, GoogleAuthProvider, FacebookAuthProvider } from 'firebase/auth'
+import { getAuth, GoogleAuthProvider, FacebookAuthProvider, setPersistence, browserLocalPersistence } from 'firebase/auth'
 import { getMessaging, isSupported } from 'firebase/messaging'
 
 const firebaseConfig = {
@@ -16,6 +16,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig)
 const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null
 const auth = getAuth(app)
+
+if (typeof window !== 'undefined') {
+  setPersistence(auth, browserLocalPersistence).catch((error) => {
+    console.warn('Firebase auth persistence failed:', error)
+  })
+}
 
 const googleProvider = new GoogleAuthProvider()
 googleProvider.setCustomParameters({ prompt: 'select_account' })

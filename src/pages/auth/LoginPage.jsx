@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import api from '../../services/api';
 import useAuthStore from '../../store/authStore';
-import { getRedirectResult, signInWithPopup, signInWithRedirect } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect } from 'firebase/auth';
 import { auth, googleProvider, facebookProvider } from '../../config/firebase';
 import { isPopupBlockedError, shouldPreferOAuthRedirect } from '../../utils/oauth';
+import { handleFirebaseOAuthReturn } from '../../utils/firebaseSocialLogin';
 
 /**
  * LoginPage
@@ -40,43 +41,33 @@ export default function LoginPage() {
     }
   }, [accessToken, user]);
 
-  // Handle Firebase redirect result (Google/Facebook redirect flow)
+  // Handle Firebase redirect result (Google/Facebook redirect flow on mobile)
   useEffect(() => {
-    let active = true;
+    let cancelled = false;
 
-    const handleRedirectResult = async () => {
+    const finishOAuthReturn = async () => {
+      setIsLoading(true);
       try {
-        const result = await getRedirectResult(auth);
-        if (!result?.user) return;
+        const authData = await handleFirebaseOAuthReturn();
+        if (!authData) return;
 
-        if (active) setIsLoading(true);
-
-        const idToken = await result.user.getIdToken();
-        const response = await api.post('/auth/firebase/login', { idToken });
-
-        if (!active) return;
-
-        if (response.data?.success) {
-          const { accessToken, refreshToken, user } = response.data.data;
-          setAuth(user, accessToken, refreshToken);
-          redirectAfterLogin(user);
-        } else {
-          setApiError(response.data?.message || 'Đăng nhập bằng chuyển hướng thất bại.');
-        }
+        const { accessToken, refreshToken, user: authUser } = authData;
+        setAuth(authUser, accessToken, refreshToken);
+        redirectAfterLogin(authUser);
       } catch (err) {
-        if (!active) return;
+        if (cancelled) return;
         const ignoredCodes = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request'];
         if (!ignoredCodes.includes(err.code)) {
           console.error('Firebase redirect login error:', err);
           setApiError(err.response?.data?.message || err.message || 'Đã có lỗi xảy ra.');
         }
       } finally {
-        if (active) setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
-    handleRedirectResult();
-    return () => { active = false; };
+    finishOAuthReturn();
+    return () => { cancelled = true; };
   }, [setAuth]);
 
   // Email / password login
@@ -212,6 +203,13 @@ export default function LoginPage() {
             <h2 className="font-h1-display text-on-surface text-3xl mb-2">Chào mừng trở lại</h2>
             <p className="font-body-main text-on-surface-variant">Đăng nhập để tiếp tục trò chuyện</p>
           </div>
+
+          {isLoading && (
+            <div className="p-4 rounded-xl bg-primary/10 text-primary text-sm font-medium flex items-center gap-2">
+              <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
+              <span>Đang xác thực tài khoản...</span>
+            </div>
+          )}
 
           {apiError && (
             <div className="p-4 rounded-xl bg-error-container text-on-error-container text-sm font-medium">

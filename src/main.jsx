@@ -3,6 +3,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
+import { bootstrapFirebaseRedirect } from './utils/firebaseRedirectAuth'
 
 /**
  * Validate required environment variables on app startup
@@ -57,6 +58,8 @@ const envValid = (() => {
 })()
 
 if (envValid) {
+  bootstrapFirebaseRedirect()
+
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
       <App />
