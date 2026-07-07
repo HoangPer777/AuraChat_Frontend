@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll } from 'vitest'
-import { createRemoteMediaStream, getIceServers } from './webrtc'
+import { createRemoteMediaStream, getIceServers, streamHasLiveVideo } from './webrtc'
 
 beforeAll(() => {
   class MockMediaStream {
@@ -60,5 +60,24 @@ describe('createRemoteMediaStream', () => {
     remote.addFromTrackEvent({ track: audioTrack, streams: [] })
 
     expect(remote.getStream().getAudioTracks()).toHaveLength(1)
+  })
+
+  it('merges tracks from event.streams when provided', () => {
+    const remote = createRemoteMediaStream()
+    const videoTrack = { kind: 'video', id: 'video-1', readyState: 'live', enabled: true }
+    const wrapper = new MediaStream([videoTrack])
+
+    remote.addFromTrackEvent({ track: videoTrack, streams: [wrapper] })
+
+    expect(remote.getStream().getVideoTracks()).toHaveLength(1)
+  })
+})
+
+describe('streamHasLiveVideo', () => {
+  it('returns true when a live video track exists', () => {
+    const stream = new MediaStream([
+      { kind: 'video', id: 'v1', readyState: 'live' },
+    ])
+    expect(streamHasLiveVideo(stream)).toBe(true)
   })
 })

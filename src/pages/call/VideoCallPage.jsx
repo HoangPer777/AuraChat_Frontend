@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { createRemoteMediaStream, waitForIceGatheringComplete } from '../../config/webrtc'
+import { createRemoteMediaStream, streamHasLiveVideo, waitForIceGatheringComplete } from '../../config/webrtc'
 import { useLocation, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
 import { connect, isConnected, subscribe } from '../../services/websocket'
@@ -8,7 +8,10 @@ import { getTerminalCallMessage, isCallRingingAck } from '../../utils/callHelper
 import { startOutgoingRing, stopRing } from '../../utils/callRingtone'
 import {
   attachStreamToVideo,
+  attachLocalTracks,
   createPeerConnection,
+  createVideoAnswer,
+  createVideoOffer,
   getLocalStream,
   publishCallAnswer,
   publishCallEnd,
@@ -28,6 +31,7 @@ export default function VideoCallPage() {
   const location = useLocation()
   const { user } = useAuthStore()
   const callIntent = useMemo(() => location.state || loadCallSession(), [location.state])
+  const isAudioCall = (callIntent?.type || 'VIDEO') === 'AUDIO'
   const [timer, setTimer] = useState(0)
   const [callStartedAt, setCallStartedAt] = useState(() => {
     const timestamp =
@@ -90,40 +94,42 @@ export default function VideoCallPage() {
   }, [localPreviewStream, isCamOn])
 
   useEffect(() => {
-    if (!remotePreviewStream || !remoteVideoRef.current) return undefined
+    if (!remotePreviewStream || !remoteVideoRef.current || isAudioCall) return undefined
 
     attachStreamToVideo(remoteVideoRef.current, remotePreviewStream)
 
     return undefined
-  }, [remotePreviewStream])
+  }, [remotePreviewStream, remoteHasVideo, isAudioCall])
 
   useEffect(() => {
     if (!remotePreviewStream) {
       setRemoteHasVideo(false)
-      return
+      return undefined
     }
 
     const updateRemoteVideo = () => {
-      setRemoteHasVideo(
-        remotePreviewStream.getVideoTracks().some((track) => track.enabled && track.readyState === 'live')
-      )
+      setRemoteHasVideo(streamHasLiveVideo(remotePreviewStream))
     }
 
     updateRemoteVideo()
+
+    const listeners = []
     remotePreviewStream.getVideoTracks().forEach((track) => {
-      track.addEventListener('ended', updateRemoteVideo)
-      track.addEventListener('mute', updateRemoteVideo)
-      track.addEventListener('unmute', updateRemoteVideo)
+      const onChange = () => updateRemoteVideo()
+      track.addEventListener('ended', onChange)
+      track.addEventListener('mute', onChange)
+      track.addEventListener('unmute', onChange)
+      listeners.push({ track, onChange })
     })
 
     return () => {
-      remotePreviewStream.getVideoTracks().forEach((track) => {
-        track.removeEventListener('ended', updateRemoteVideo)
-        track.removeEventListener('mute', updateRemoteVideo)
-        track.removeEventListener('unmute', updateRemoteVideo)
+      listeners.forEach(({ track, onChange }) => {
+        track.removeEventListener('ended', onChange)
+        track.removeEventListener('mute', onChange)
+        track.removeEventListener('unmute', onChange)
       })
     }
-  }, [remotePreviewStream])
+  }, [remotePreviewStream, isAudioCall])
 
   useEffect(() => {
     if (!remotePreviewStream || !remoteAudioRef.current) return undefined
@@ -389,8 +395,17 @@ export default function VideoCallPage() {
       const mergedStream = new MediaStream(remoteStreamCollectorRef.current.getStream().getTracks())
       setRemotePreviewStream(mergedStream)
 
+      if (event.track?.kind === 'video') {
+        setRemoteHasVideo(true)
+      } else if (streamHasLiveVideo(mergedStream)) {
+        setRemoteHasVideo(true)
+      }
+
       if (remoteAudioRef.current) {
         attachStreamToVideo(remoteAudioRef.current, mergedStream)
+      }
+      if (remoteVideoRef.current && !isAudioCall) {
+        attachStreamToVideo(remoteVideoRef.current, mergedStream)
       }
     }
 
@@ -459,13 +474,12 @@ export default function VideoCallPage() {
       })
 
       peerConnectionRef.current = peerConnection
-      localStream.getTracks().forEach((track) => peerConnection.addTrack(track, localStream))
+      attachLocalTracks(peerConnection, localStream)
 
       if (callIntent.mode === 'incoming') {
         resolveCallId(callIntent.callId)
         await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: callIntent.sdp }))
-        const answer = await peerConnection.createAnswer()
-        await peerConnection.setLocalDescription(answer)
+        const answerSdp = await createVideoAnswer(peerConnection)
         await waitForIceGatheringComplete(peerConnection)
 
         const acceptedAt = new Date().toISOString()
@@ -474,7 +488,7 @@ export default function VideoCallPage() {
           callId: callIntent.callId,
           callerId: callIntent.callerId,
           receiverId: callIntent.receiverId || user?.id,
-          sdp: peerConnection.localDescription?.sdp || answer.sdp,
+          sdp: peerConnection.localDescription?.sdp || answerSdp,
           acceptedAt,
         })
 
@@ -487,18 +501,14 @@ export default function VideoCallPage() {
         syncConnectedTime(acceptedAt)
         await flushBufferedCandidates()
       } else {
-        const offer = await peerConnection.createOffer({
-          offerToReceiveAudio: true,
-          offerToReceiveVideo: !isAudioCall,
-        })
-        await peerConnection.setLocalDescription(offer)
+        const offerSdp = await createVideoOffer(peerConnection)
         await waitForIceGatheringComplete(peerConnection)
 
         const published = await publishCallOffer({
           receiverId: callIntent.receiverId,
           type: callType,
           conversationId: callIntent.conversationId,
-          sdp: peerConnection.localDescription?.sdp || offer.sdp,
+          sdp: peerConnection.localDescription?.sdp || offerSdp,
         })
 
         if (!published) {
@@ -567,7 +577,6 @@ export default function VideoCallPage() {
 
   const remoteName = callIntent?.receiverName || callIntent?.callerName || 'Đang gọi'
   const localLabel = user?.displayName || user?.email || 'Bạn'
-  const isAudioCall = (callIntent?.type || 'VIDEO') === 'AUDIO'
   const remoteAvatar = callIntent?.receiverAvatar || callIntent?.callerAvatar
     || `https://ui-avatars.com/api/?name=${encodeURIComponent(remoteName)}`
   const callTypeLabel = isAudioCall ? 'Cuộc gọi thoại' : 'Cuộc gọi video'
@@ -582,12 +591,29 @@ export default function VideoCallPage() {
     <div className="bg-[#0f0f13] h-screen w-screen overflow-hidden text-white font-sans relative">
       <audio ref={remoteAudioRef} autoPlay playsInline muted={false} className="sr-only" />
 
-      {showRemoteVideo ? (
-        <div className="absolute inset-0 z-0">
-          <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover opacity-90 bg-black" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80" />
+      {/* Luôn mount video remote — tránh mất ref khi stream tới trước lúc render UI */}
+      {!isAudioCall && (
+        <div className={`absolute inset-0 z-0 ${showRemoteVideo ? '' : 'pointer-events-none opacity-0'}`}>
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className="w-full h-full object-cover bg-black"
+            style={{ opacity: showRemoteVideo ? 0.9 : 0 }}
+          />
+          {showRemoteVideo && (
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80" />
+          )}
         </div>
-      ) : (
+      )}
+
+      {!showRemoteVideo && !isAudioCall && (
+        <div className="absolute inset-0 z-0 bg-gradient-to-br from-[#1e1e2e] to-[#0f0f13]">
+          <CallBackgroundGlow />
+        </div>
+      )}
+
+      {isAudioCall && (
         <div className="absolute inset-0 z-0 bg-gradient-to-br from-[#1e1e2e] to-[#0f0f13]">
           <CallBackgroundGlow />
         </div>

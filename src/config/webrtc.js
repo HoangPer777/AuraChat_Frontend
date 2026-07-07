@@ -36,6 +36,16 @@ export function createRemoteMediaStream() {
       const track = event?.track
       if (!track) return stream
 
+      const streamFromEvent = event.streams?.[0]
+      if (streamFromEvent) {
+        streamFromEvent.getTracks().forEach((incomingTrack) => {
+          if (!stream.getTracks().some((existing) => existing.id === incomingTrack.id)) {
+            stream.addTrack(incomingTrack)
+          }
+        })
+        return stream
+      }
+
       if (!stream.getTracks().some((existing) => existing.id === track.id)) {
         stream.addTrack(track)
       }
@@ -46,6 +56,11 @@ export function createRemoteMediaStream() {
       return stream
     },
   }
+}
+
+export function streamHasLiveVideo(stream) {
+  if (!stream) return false
+  return stream.getVideoTracks().some((track) => track.readyState === 'live')
 }
 
 export function getPeerConnectionConfig() {

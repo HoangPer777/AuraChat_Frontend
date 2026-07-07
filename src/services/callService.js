@@ -4,9 +4,9 @@ import { send } from './websocket'
 export function createPeerConnection({ onTrack, onIceCandidate, onConnectionStateChange, onIceConnectionStateChange }) {
   const peerConnection = new RTCPeerConnection(getPeerConnectionConfig())
 
-  peerConnection.ontrack = (event) => {
+  peerConnection.addEventListener('track', (event) => {
     onTrack?.(event)
-  }
+  })
 
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
@@ -79,7 +79,7 @@ export async function getLocalStream(kind = 'VIDEO') {
 }
 
 export async function attachStreamToVideo(videoEl, stream) {
-  if (!videoEl || !stream) return
+  if (!videoEl || !stream) return false
 
   if (videoEl.srcObject !== stream) {
     videoEl.srcObject = stream
@@ -87,11 +87,42 @@ export async function attachStreamToVideo(videoEl, stream) {
 
   try {
     await videoEl.play()
+    return true
   } catch (error) {
     if (error?.name !== 'AbortError') {
       console.warn('Video preview play failed:', error)
     }
+    return false
   }
+}
+
+export function attachLocalTracks(peerConnection, localStream) {
+  if (!peerConnection || !localStream) return
+
+  const senders = peerConnection.getSenders()
+  localStream.getTracks().forEach((track) => {
+    const existing = senders.find((sender) => sender.track?.kind === track.kind)
+    if (existing) {
+      existing.replaceTrack(track).catch((error) => {
+        console.warn('replaceTrack failed, falling back to addTrack:', error)
+        peerConnection.addTrack(track, localStream)
+      })
+      return
+    }
+    peerConnection.addTrack(track, localStream)
+  })
+}
+
+export async function createVideoOffer(peerConnection) {
+  const offer = await peerConnection.createOffer()
+  await peerConnection.setLocalDescription(offer)
+  return peerConnection.localDescription?.sdp || offer.sdp
+}
+
+export async function createVideoAnswer(peerConnection) {
+  const answer = await peerConnection.createAnswer()
+  await peerConnection.setLocalDescription(answer)
+  return peerConnection.localDescription?.sdp || answer.sdp
 }
 
 export function publishCallOffer(payload) {
